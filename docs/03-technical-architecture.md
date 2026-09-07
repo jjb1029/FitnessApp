@@ -15,7 +15,7 @@ Validated 2026-09-07: single mobile application, no backend in Phase 1, infrastr
 | Lists | @shopify/flash-list | 2.x | 1 | History and exercise lists |
 | Animation / gestures | react-native-reanimated 4, react-native-gesture-handler 3 | bundled | 1 | Sheets, timer, list transitions |
 | Keyboard | react-native-keyboard-controller | 1.x | 1 | Numeric entry on the workout screen |
-| Fast KV | react-native-mmkv | 4.x | 1 | Preferences, last route, flags |
+| Fast KV | expo-sqlite/kv-store | 57.x | 1 | Preferences, last route, flags. MMKV v4 needs Nitro modules and a prebuild; the built-in store is enough |
 | Haptics / notifications | expo-haptics, expo-notifications | 57.x | 1 | Set complete, rest timer alert |
 | Charts | decided by a one-day spike in M1: victory-native (Skia) vs a pure-JS SVG chart | | 1 | Three chart types; pick the simpler one that renders well in dark mode |
 | Crash reporting | Sentry (opt-in) | | 1 | No product analytics SDK in Phase 1 |
@@ -25,15 +25,17 @@ Validated 2026-09-07: single mobile application, no backend in Phase 1, infrastr
 | Secure storage | expo-secure-store | 57.x | 2 | Session tokens |
 | Health data | react-native-health, react-native-health-connect | 1.x / 4.x | 3 | Real integrations, explicit unavailable states |
 | Testing | Jest + React Native Testing Library, Maestro for E2E | | 1 | Engine rules get exhaustive fixture tests |
-| Tooling | pnpm, ESLint (expo config + import boundaries), Prettier | Node 24 | 1 | |
+| Tooling | npm, ESLint (expo config + import boundaries + React Compiler rules), Jest | Node 24 | 1 | |
 
 **Styling:** typed `StyleSheet` with a theme object served by `useTheme()`. No Tailwind-style layer, no Expo UI primitives for the MVP.
+
+**Web:** enabled only to preview the design system in a browser (`npm run web`, then `/dev/gallery`). `db.web.ts` and `DatabaseProvider.web.tsx` stub the database out; nothing else is web-specific and no feature is tested on web.
 
 ## 2. Repository layout (single Expo app)
 
 ```
 FitnessApp/
-├─ app/                          Expo Router routes (thin: params, layout, one screen component each)
+├─ src/app/                      Expo Router routes (thin: params, layout, one screen component each)
 │  ├─ _layout.tsx                providers: theme, database, session store, notifications
 │  ├─ (tabs)/                    home.tsx · train.tsx · progress.tsx
 │  ├─ onboarding/                goal · schedule · equipment · recommendation · personalise
