@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DatabaseProvider } from '@/data/DatabaseProvider';
 import { UserProvider, useCurrentUser } from '@/features/app/UserProvider';
+import { configureNotifications } from '@/services/notifications';
 import { Text, ThemeProvider, ToastProvider, useTheme } from '@/ui';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -46,6 +47,7 @@ function Navigation() {
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => undefined);
+    configureNotifications();
   }, []);
 
   const header = { headerShown: true, headerStyle: { backgroundColor: theme.colors.bg }, headerTintColor: theme.colors.text, headerShadowVisible: false };
@@ -60,6 +62,7 @@ function Navigation() {
         <Stack.Protected guard={onboarded}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="settings/index" options={{ ...header, title: 'Settings' }} />
+          <Stack.Screen name="workout/[sessionId]" options={{ presentation: 'fullScreenModal', gestureEnabled: false, animation: theme.reduceMotion ? 'fade' : 'slide_from_bottom' }} />
         </Stack.Protected>
         <Stack.Screen name="dev/gallery" options={{ ...header, title: 'Component gallery' }} />
       </Stack>

@@ -127,6 +127,41 @@ export const RULES = {
     sample: {},
     knowledgeItemIds: ['rir-rpe.why-rir'],
   },
+  'progression.double.increase_load_reps': {
+    name: 'Double progression: add weight (reps only)',
+    description: 'Every working set reached the top of the rep range. Without RIR data the engine treats that as ready for more weight and restarts at the bottom of the range.',
+    tier1: 'Every set reached the top of your rep range, so the weight goes up.',
+    sample: {},
+    knowledgeItemIds: ['progressive-overload.double-progression'],
+  },
+  'progression.double.hold_reps': {
+    name: 'Double progression: repeat before adding a rep',
+    description: 'Inside the range but at or near failure, the same reps are repeated once so the next rep comes with margin.',
+    tier1: 'You are inside the range but close to your limit. Repeat it, then add a rep.',
+    sample: {},
+    knowledgeItemIds: ['rir-rpe.why-rir'],
+  },
+  'progression.same_day': {
+    name: 'Second session of the day',
+    description: 'When an exercise was already trained today, targets repeat rather than progress, so a double session does not double-count.',
+    tier1: 'You already trained this today, so the targets stay the same.',
+    sample: {},
+    knowledgeItemIds: ['frequency.consistency'],
+  },
+  'pr.e1rm': {
+    name: 'Estimated one-rep max record',
+    description: 'A set whose estimated one-rep max (Epley: load × (1 + reps ÷ 30), reps of 12 or fewer) beats every previous working set for this exercise.',
+    tier1: 'Your best estimated one-rep max on this exercise, up {delta} on the previous best.',
+    sample: { delta: '4 lb' },
+    knowledgeItemIds: ['strength.estimated-1rm'],
+  },
+  'pr.load': {
+    name: 'Heaviest load record',
+    description: 'The heaviest working-set load ever logged for this exercise.',
+    tier1: 'The most weight you have lifted on this exercise.',
+    sample: {},
+    knowledgeItemIds: ['strength.estimated-1rm'],
+  },
 
   // ---------------- Substitution ----------------
   'substitution.rank': {

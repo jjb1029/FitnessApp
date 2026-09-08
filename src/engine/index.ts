@@ -5,3 +5,5 @@ export * from './substitution';
 export * from './programSelector';
 export * from './scheduling';
 export * from './bodyweight';
+export * from './strength';
+export * from './progression';

@@ -6,7 +6,7 @@ import { defaultWeightUnitForLocale } from '@/lib/units';
 import { uuidv7 } from '@/lib/uuid';
 
 import { db } from '../db';
-import { users, type UserRow } from '../schema';
+import { profiles, users, type ProfileRow, type UserRow } from '../schema';
 
 function deviceLocale(): string | undefined {
   try {
@@ -42,6 +42,10 @@ export async function updateUserSettings(userId: string, patch: Partial<UserSett
     .update(users)
     .set({ settings: { ...current.settings, ...patch }, updatedAt: nowIso(), version: current.version + 1 })
     .where(eq(users.id, userId));
+}
+
+export async function getProfile(userId: string): Promise<ProfileRow | null> {
+  return (await db.select().from(profiles).where(eq(profiles.userId, userId)).get()) ?? null;
 }
 
 /** Dev helper: wipe onboarding state so the flow can be re-run. */

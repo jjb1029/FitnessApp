@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { features } from '@/config/flags';
-import { logBodyweight, setNextDayIndex } from '@/data/repositories';
+import { abandonSession, finishSession, loadSession, logBodyweight, setNextDayIndex, startSession } from '@/data/repositories';
 import { advanceDayIndex } from '@/engine';
 import { greetingForHour, localDate, weeksSince } from '@/lib/dates';
 import { formatWeight, kgToUnit, unitToKg } from '@/lib/units';
@@ -12,8 +12,11 @@ import { useUiStore } from '@/store/uiStore';
 import { Button, Card, IconButton, ListRow, NumericKeypad, Screen, Sheet, Skeleton, Text, WhySheet, useTheme, useToast } from '@/ui';
 
 import { useCurrentUser } from '../app/UserProvider';
+import { useNow } from '../app/useNow';
 import { TodayCard } from './TodayCard';
 import { useHomeData } from './useHomeData';
+
+const STALE_SESSION_MS = 12 * 60 * 60 * 1000;
 
 export function HomeScreen() {
   const theme = useTheme();
@@ -33,9 +36,42 @@ export function HomeScreen() {
   const week = weeksSince(active?.program.startedAt ?? null);
   const deferred = deferredOn === localDate();
 
-  const startWorkout = () => {
-    // Session logging arrives in M3; the button is wired so the flow is testable now.
-    toast.show({ message: 'Workout logging arrives in the next build.' });
+  const [starting, setStarting] = useState(false);
+  const now = useNow(60_000);
+  const inProgress = data?.inProgress ?? null;
+  const staleSession = inProgress && now - Date.parse(inProgress.startedAt) > STALE_SESSION_MS ? inProgress : null;
+
+  const openSession = (sessionId: string) => router.push({ pathname: '/workout/[sessionId]', params: { sessionId } });
+
+  const startWorkout = async () => {
+    if (inProgress && !staleSession) {
+      openSession(inProgress.id);
+      return;
+    }
+    if (!active || !today || starting) return;
+    setStarting(true);
+    try {
+      const dayIndex = today.kind === 'rest' ? today.nextDayIndex : today.dayIndex;
+      const experience = (data?.profile?.trainingExperience as 'beginner' | 'intermediate' | 'advanced' | undefined) ?? 'intermediate';
+      const id = await startSession({ userId: user.id, active, dayIndex, unit, experience, outOfSequence: today.kind === 'rest' });
+      openSession(id);
+    } catch (e) {
+      toast.show({ message: e instanceof Error ? e.message : "Couldn't start the workout" });
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const resolveStale = async (action: 'finish' | 'discard') => {
+    if (!staleSession) return;
+    if (action === 'discard') {
+      await abandonSession(staleSession.id);
+    } else {
+      const loaded = await loadSession(staleSession.id);
+      const experience = (data?.profile?.trainingExperience as 'beginner' | 'intermediate' | 'advanced' | undefined) ?? 'intermediate';
+      if (loaded) await finishSession({ userId: user.id, loaded, unit, experience });
+    }
+    refetch();
   };
 
   const skipDay = async () => {
@@ -86,7 +122,7 @@ export function HomeScreen() {
           <TodayCard
             active={active}
             today={today}
-            inProgress={data?.inProgress ?? null}
+            inProgress={staleSession ? null : inProgress}
             deferred={deferred}
             onStart={startWorkout}
             onDefer={() => setDeferredOn(localDate())}
@@ -137,6 +173,16 @@ export function HomeScreen() {
       </Sheet>
 
       <WhySheet visible={why} onClose={() => setWhy(false)} title={today && today.kind !== 'rest' ? today.day.name : 'Rest day'} explanation={today?.explanation ?? null} />
+
+      <Sheet visible={staleSession !== null} onClose={() => undefined} title={staleSession ? `Unfinished ${staleSession.name}` : ''}>
+        <Text variant="body" color="textSecondary">
+          You started this workout {staleSession ? Math.round((now - Date.parse(staleSession.startedAt)) / 3_600_000) : 0} hours ago. Finish it to keep the sets you logged, or discard it.
+        </Text>
+        <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.lg }}>
+          <Button label="Finish it" size="lg" fullWidth onPress={() => resolveStale('finish')} />
+          <Button label="Discard" variant="destructive" onPress={() => resolveStale('discard')} style={{ alignSelf: 'center' }} />
+        </View>
+      </Sheet>
     </Screen>
   );
 }

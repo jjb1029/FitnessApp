@@ -4,6 +4,27 @@ Forma is a mobile strength-training app with one promise: tell it what you want 
 
 ---
 
+## 2026-09-07 · M3: the workout screen
+
+### Where things stand
+The core loop is closed. Start today's workout from Home, log sets from a sticky dock at the bottom of the screen, rest with a timer that survives backgrounding, finish, and read what changes next time with a Why on every number. The next session's targets come from the progression engine using what was actually logged.
+
+### What got built
+- **Progression engine v1** (`src/engine/progression.ts`): double progression with optional RIR, beginner linear loading that switches itself to double progression after two misses, bodyweight movements that add load only after the rep range is filled, layoff easing, same-day guard, override calibration after three consistent overrides, and never more than two increments of change. Every outcome is an Explanation with a counterfactual ("If 8 reps at 80 lb is too hard, I will keep 80 and aim for the bottom of the range next time"). 14 fixture tests cover the brief's worked examples.
+- **Estimated 1RM and records**: Epley for 12 reps or fewer, personal records only once a completed session exists for the exercise, so the first day sets baselines rather than trophies.
+- **Warm-up suggestion**: two or three ramp sets for primary compounds from the working load.
+- **Session data layer**: start a session with engine targets snapshotted per exercise, save and edit sets with PR detection, swap an exercise (session-only or into the program, with an avoid preference recorded for discomfort), add exercises, skip with a reason, finish with a summary and next-time targets, abandon, and a stale-session recovery path on Home after 12 hours.
+- **Workout screen**: vertical exercise list with the current exercise expanded and others one line each, the input dock (Weight and Reps steppers, optional RIR picker, Why, Complete set), rest timer inside the dock with −15 / +15 / Skip and a local notification when backgrounded, in-app keypad with quick-add chips, edit a done set in place, add set, warm-ups, swap sheet with similarity scores and Why, notes, exercise info sheet, session menu, finish-early and discard confirmations, and a summary with one PR moment and explainable next-time targets.
+- **Around it**: a Resume pill above the tab bar while a session is minimised, keep-awake during workouts, haptics that respect the setting, and in-memory web stubs so the whole flow can be exercised in a browser.
+
+### Verified
+Type-check and lint clean, 122 tests. In the browser: onboarding → Home → Start workout → three sets logged with keypad and steppers → auto-advance to the next exercise → Why sheet → finish early → summary. Not yet verified on a phone.
+
+### What is next
+M4: history, per-exercise charts, bodyweight and strength trends, PR list. Then M5 program editing and the first recommendation cards.
+
+---
+
 ## 2026-09-07 · Day 1: architecture, foundation, onboarding, and the first run on a phone
 
 ### Where things stand
