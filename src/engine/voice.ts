@@ -1,11 +1,12 @@
 /**
- * Forma's voice (docs/14 §2). Every line is chosen by a state the engine or
- * the session produced; nothing here is decorative. Variants rotate by a
- * deterministic seed so a session does not repeat itself and a re-render
+ * Forma's voice (docs/14 §2, docs/15 §4). Every line is chosen by a state the
+ * engine or the session produced; nothing here is decorative. Variants rotate
+ * by a deterministic seed so a session does not repeat itself and a re-render
  * never changes a line.
  *
  * Rules: short declaratives, periods, no exclamation marks, no emoji.
  * "I" for Forma's decisions, "you" for the user's effort, "we" rarely.
+ * Forma speaks at transitions and is silent while the user is working.
  */
 
 import type { RepRange } from '@/domain';
@@ -55,11 +56,11 @@ export function setAcknowledgement({ outcome, setIndex, setsRemaining }: Acknowl
     case 'edit':
       return 'Updated.';
     case 'below':
-      return pick(['Tough set. Logged. I will account for that.', 'Logged. I will account for that next time.'], setIndex);
+      return pick(["Tough set. Logged. I'll account for that.", "Logged. I'll take that into account next time."], setIndex);
     case 'better':
       return pick(['That was better than last time.', 'Better than last time. Noted.'], setIndex);
     case 'above':
-      return pick(['Above target. I will account for that next time.', 'Above target. Noted.'], setIndex);
+      return pick(["Above target. I'll take that into account.", 'Above target. Noted.'], setIndex);
     case 'hit':
       if (setsRemaining === 1) return 'Nice. One more.';
       return pick(['Good set.', 'Right where we wanted you.', 'Good set.'], setIndex);
@@ -78,7 +79,7 @@ export type TargetLineInput = {
   isBodyweight: boolean;
 };
 
-/** The dock's context line: Forma's sentence about the current target. */
+/** The decision Forma made about this exercise, stated plainly. */
 export function targetLine(t: TargetLineInput): string {
   if (t.ruleId === 'progression.seed' || t.loadDisplay === null) {
     return t.isBodyweight ? `Bodyweight today. Aim for ${t.reps} with room to spare.` : `Pick a weight you can do ${t.reps} with room to spare.`;
@@ -96,12 +97,31 @@ export function targetLine(t: TargetLineInput): string {
   return `${load} today.`;
 }
 
-export const ENTER_WEIGHT_LINE = 'Enter a weight to log.';
+export type ArrivalInput = TargetLineInput & {
+  /** True when the suggested load is heavier than anything logged for this exercise before. */
+  firstTimeAtLoad: boolean;
+};
 
-/** After the first set the dock only needs the count; the fields already carry the numbers. */
-export function setLine(setNumber: number, planned: number): string {
-  if (planned > 0 && setNumber >= planned) return `Last set of ${planned}.`;
-  return `Set ${setNumber} of ${Math.max(planned, setNumber)}.`;
+/**
+ * The line shown when the user arrives at an exercise. Forma speaks up
+ * (`tone: 'accent'`) only when it did something the user should know about:
+ * it changed its own jumps, eased the weight, or is asking for a load the
+ * user has never lifted. Otherwise it simply states the decision and is quiet.
+ */
+export function arrivalLine(t: ArrivalInput): { line: string; tone: 'neutral' | 'accent' } {
+  if (t.ruleId === 'progression.calibrate') {
+    return { line: "You've gone heavier than I suggested three times. I've made the jumps bigger.", tone: 'accent' };
+  }
+  if (t.ruleId === 'progression.reduce_load' && t.loadDisplay) {
+    return { line: `Two tough sessions. I've eased this to ${t.loadDisplay} today.`, tone: 'accent' };
+  }
+  if (t.ruleId === 'progression.layoff' && t.loadDisplay) {
+    return { line: `Time off, so ${t.loadDisplay} today. Build back from there.`, tone: 'accent' };
+  }
+  if (t.firstTimeAtLoad && t.loadDisplay && !t.isBodyweight) {
+    return { line: `First time at ${t.loadDisplay}. Get ${t.reps} and it stays.`, tone: 'accent' };
+  }
+  return { line: targetLine(t), tone: 'neutral' };
 }
 
 /** Title for the Why sheet: the decision itself. */
@@ -135,15 +155,19 @@ export type FinishVerdictInput = {
   prCount: number;
 };
 
-export function finishVerdict(v: FinishVerdictInput): string {
-  if (v.workingSets === 0) return 'Nothing logged this time. The plan is unchanged.';
+export type Verdict = { headline: string; detail: string | null };
+
+/** The verdict leads the summary; the detail is the promise about next time. */
+export function finishVerdict(v: FinishVerdictInput): Verdict {
+  if (v.workingSets === 0) return { headline: 'Nothing logged this time.', detail: 'The plan is unchanged.' };
   const lifts = v.increases === 1 ? 'One lift goes up next time.' : v.increases > 1 ? `${v.increases} lifts go up next time.` : null;
-  if (v.earlyFinish) return lifts ? `Good stopping point. ${lifts}` : 'Good stopping point. Nothing is lost.';
-  if (v.prCount > 0) return lifts ? `You got stronger today. ${lifts}` : 'You got stronger today.';
-  if (v.allTargetsHit) return lifts ? `Every target hit. ${lifts}` : 'Every target hit. I have set next time.';
-  return lifts ? `Solid session. ${lifts}` : 'Solid session. I have set next time.';
+  if (v.prCount > 0) return { headline: 'You got stronger today.', detail: lifts };
+  if (v.earlyFinish) return { headline: 'Good stopping point.', detail: lifts ?? 'Nothing is lost.' };
+  if (v.allTargetsHit) return { headline: 'Every target hit.', detail: lifts };
+  return { headline: 'Solid session.', detail: lifts };
 }
 
+export const NEXT_SESSION_SET = "I've set next session.";
 export const DONE_FOR_TODAY = 'Done for today';
 
 // ---------- Home ----------
@@ -158,16 +182,15 @@ export type TodayLineInput = {
 /** One sentence under the day name: what today is about, from the engine's targets. */
 export function todayLine(t: TodayLineInput): string {
   const focus = t.focus.length > 0 ? `${joinNatural(t.focus)}.` : '';
-  if (t.welcomeBackPercent !== null) return `${focus} Welcome back. I have eased today's loads by ${t.welcomeBackPercent}%.`.trim();
-  if (t.firstSession) return `${focus} Your first session. Find your weights and I will take it from there.`.trim();
+  if (t.welcomeBackPercent !== null) return `${focus} Welcome back. I've eased today's loads by ${t.welcomeBackPercent}%.`.trim();
+  if (t.firstSession) return `${focus} Your first session. Find your weights and I'll take it from there.`.trim();
   if (t.increases.length === 1) return `${focus} ${t.increases[0]!.name} goes up to ${t.increases[0]!.loadDisplay}.`.trim();
   if (t.increases.length > 1) return `${focus} ${t.increases.length} lifts go up today, starting with ${t.increases[0]!.name.toLowerCase()}.`.trim();
   return `${focus} Same weights as last time. Add a rep where you can.`.trim();
 }
 
-/** Header fragment, no period: it sits before a separator. */
 export function readyLine(dayName: string): string {
-  return `${dayName} is ready`;
+  return `${dayName} is ready.`;
 }
 
 /** "Chest, lats, and side delts": first item keeps its case, the rest read as prose. */

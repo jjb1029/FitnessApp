@@ -5,6 +5,7 @@ import {
   addSessionExercise,
   deleteSet as deleteSetRepo,
   finishSession as finishSessionRepo,
+  getExerciseBests,
   getExerciseHistory,
   loadSession,
   saveSet,
@@ -55,6 +56,8 @@ type SessionState = {
   justLandedSetId: string | null;
   /** Previous session's working sets per exercise id, for "last time" and better-than-last-time grading. */
   previous: Record<string, SetRecord[]>;
+  /** Heaviest working load ever logged per exercise id, so Forma can say when a weight is new. */
+  bests: Record<string, number | null>;
   finished: Finished | null;
   unit: WeightUnit;
   experience: Experience;
@@ -148,6 +151,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   moment: null,
   justLandedSetId: null,
   previous: {},
+  bests: {},
   finished: null,
   unit: 'lb',
   experience: 'intermediate',
@@ -162,14 +166,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const loaded = await loadSession(sessionId);
       if (!loaded) throw new Error('Session not found');
       const previous: Record<string, SetRecord[]> = {};
+      const bests: Record<string, number | null> = {};
       for (const e of loaded.exercises) {
         if (previous[e.exercise.id]) continue;
-        const history = await getExerciseHistory(get().userId, e.exercise.id, 1, sessionId);
+        const [history, best] = await Promise.all([getExerciseHistory(get().userId, e.exercise.id, 1, sessionId), getExerciseBests(get().userId, e.exercise.id)]);
         previous[e.exercise.id] = history[0]?.sets ?? [];
+        bests[e.exercise.id] = best.bestLoadKg;
       }
       const currentExerciseId = firstPending(loaded);
       const current = loaded.exercises.find((e) => e.id === currentExerciseId);
-      set({ loaded, previous, loading: false, currentExerciseId, draft: current ? draftFor(current, get().unit) : null });
+      set({ loaded, previous, bests, loading: false, currentExerciseId, draft: current ? draftFor(current, get().unit) : null });
     } catch (e) {
       set({ loading: false, error: e instanceof Error ? e : new Error(String(e)) });
     }
@@ -178,7 +184,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   clear: () => {
     const { rest } = get();
     if (rest) cancelRestEnd(rest.notificationId).catch(() => undefined);
-    set({ loaded: null, currentExerciseId: null, draft: null, rest: null, moment: null, justLandedSetId: null, previous: {}, finished: null, error: null });
+    set({ loaded: null, currentExerciseId: null, draft: null, rest: null, moment: null, justLandedSetId: null, previous: {}, bests: {}, finished: null, error: null });
   },
 
   setCurrent: (id) => {
@@ -365,25 +371,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   swap: async (sessionExerciseId, toExercise, reason, scope) => {
-    const { loaded, unit, userId, experience, previous } = get();
+    const { loaded, unit, userId, experience, previous, bests } = get();
     const e = loaded?.exercises.find((x) => x.id === sessionExerciseId);
     if (!loaded || !e) return;
     const row = await swapSessionExercise({ userId, session: loaded.session, sessionExercise: e, toExercise, reason, scope, unit, experience });
     const updated = replaceExercise(loaded, sessionExerciseId, (x) => ({ ...x, ...row, exercise: toExercise, sets: [] }));
     const e2 = updated.exercises.find((x) => x.id === sessionExerciseId)!;
     const history = previous[toExercise.id] ?? (await getExerciseHistory(userId, toExercise.id, 1, loaded.session.id))[0]?.sets ?? [];
-    set({ loaded: updated, previous: { ...previous, [toExercise.id]: history }, currentExerciseId: sessionExerciseId, draft: draftFor(e2, unit) });
+    const best = bests[toExercise.id] ?? (await getExerciseBests(userId, toExercise.id)).bestLoadKg;
+    set({ loaded: updated, previous: { ...previous, [toExercise.id]: history }, bests: { ...bests, [toExercise.id]: best }, currentExerciseId: sessionExerciseId, draft: draftFor(e2, unit) });
     get().setMoment(`${toExercise.name} instead. ${scope === 'program' ? 'I updated your program.' : 'Just for today.'}`, 'neutral', 3000);
   },
 
   addExercise: async (exercise) => {
-    const { loaded, unit, userId, experience, previous } = get();
+    const { loaded, unit, userId, experience, previous, bests } = get();
     if (!loaded) return;
     const row: SessionExerciseRow = await addSessionExercise(loaded.session.id, userId, exercise, loaded.exercises.length, unit, experience);
     const e: LoadedExercise = { ...row, exercise, sets: [] };
     const updated = { ...loaded, exercises: [...loaded.exercises, e] };
     const history = previous[exercise.id] ?? (await getExerciseHistory(userId, exercise.id, 1, loaded.session.id))[0]?.sets ?? [];
-    set({ loaded: updated, previous: { ...previous, [exercise.id]: history }, currentExerciseId: e.id, draft: draftFor(e, unit) });
+    const best = bests[exercise.id] ?? (await getExerciseBests(userId, exercise.id)).bestLoadKg;
+    set({ loaded: updated, previous: { ...previous, [exercise.id]: history }, bests: { ...bests, [exercise.id]: best }, currentExerciseId: e.id, draft: draftFor(e, unit) });
   },
 
   startRest: async (seconds, exerciseName) => {

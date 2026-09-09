@@ -4,6 +4,20 @@ Forma is a mobile strength-training app with one promise: tell it what you want 
 
 ---
 
+## 2026-09-08 · M3 character: what the screen is arranged around
+
+The personality layer gave Forma a voice but not a shape. The workout screen was still arranged the way every tracker is arranged: a list of the workout with a data-entry surface attached, with good copy on top. This pass reorganises the screens around the decision Forma made rather than the record the user is keeping (docs/15).
+
+- **The current action is one block.** The dock now owns the exercise name, the numbers, and the button, so "what am I doing right now" is a single unit under the thumb. The exercise title in the list dropped from 22 pt to 17 and the set numbers rose to 32 pt bold, so the loudest thing on the workout screen is what you are about to lift. The block above the dock became the history.
+- **Forma speaks up only when it did something.** The dock has one line slot with three registers: a moment when something happened, the decision when you arrive at an exercise, and a quiet reference line while you work. Arrival moments fire for the three things a tracker would never say: it changed its own jumps after you overrode it three times, it eased the weight after two tough sessions, and it is asking for a load you have never lifted. Held back during rest so they land when you return to the action.
+- **Why reads like a person answering.** The decision, what I saw, what changes my mind, and then how the rule works one tap further in.
+- **The finish is a debrief.** A verdict from the session data leads, the per-lift evidence follows, and it closes with "I've set next session" above the actual targets.
+- **Home leads with readiness.** "Upper A is ready." with the sentence as its basis.
+
+Also fixed: `useKeepAwake` crashed the workout screen on a second session because the lock had not finished activating. Replaced with a hook that swallows the failure.
+
+138 tests. Verified in the browser across two sessions, including the same-day rule correctly declining to progress twice in one day.
+
 ## 2026-09-08 · M3 polish: the personality layer
 
 After the first phone run the verdict was "clean but bland". The audit (docs/14) found the cause: the engine made every decision but the screens showed them as metadata, nothing acknowledged the user, and rest looked like lifting with a countdown. This pass adds a voice and a rhythm on top of the existing foundation, with no new features.

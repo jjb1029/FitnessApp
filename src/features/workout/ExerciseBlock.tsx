@@ -109,16 +109,14 @@ export function ExerciseBlock(p: ExerciseBlockProps) {
 
   return (
     <View style={[styles.expanded, { backgroundColor: theme.colors.bgElevated, borderRadius: theme.radius.lg, marginHorizontal: theme.spacing.sm, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.md }]}>
+      {/* The dock owns the exercise's identity and its numbers; this block is the history. */}
       <View style={styles.header}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="title2" numberOfLines={2}>
+          <Text variant="headline" numberOfLines={2}>
             {item.exercise.name}
           </Text>
-          <Text variant="callout" color="textSecondary">
-            {specLine(planned, snap.repRange.min, snap.repRange.max)} · {formatEffort(snap.targetRir, scale)} in reserve · {formatRest(item.restSecondsOverride ?? snap.restSeconds)} rest
-          </Text>
-          <Text variant="caption" color={firstTime ? 'textSecondary' : 'textTertiary'}>
-            {firstTime ? `First time. Find a weight you can do ${snap.repRange.min} with room to spare.` : `Last time ${lastTime}`}
+          <Text variant="caption" color="textTertiary">
+            {firstTime ? 'First time' : `Last time ${lastTime}`} · {formatRest(item.restSecondsOverride ?? snap.restSeconds)} rest
           </Text>
         </View>
         <IconButton icon="ellipsis-horizontal" accessibilityLabel="Exercise options: swap, note, skip, how to do it, rest" onPress={p.onMenu} />

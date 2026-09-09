@@ -18,6 +18,8 @@ export type StepperProps = {
   formatValue?: (value: number) => string;
   /** Visual weight: primary fields are bolder than optional ones. */
   emphasis?: 'primary' | 'secondary';
+  /** `action` is for the number the user is about to act on (docs/15 §3). */
+  size?: 'md' | 'action';
   /** Called on every detent (each increment or decrement); the caller decides haptics. */
   onBump?: () => void;
   /** Dims the control without disabling it, e.g. during rest. */
@@ -41,6 +43,7 @@ export function Stepper({
   onPressValue,
   formatValue,
   emphasis = 'primary',
+  size = 'md',
   onBump,
   muted = false,
   accessibilityLabel,
@@ -86,7 +89,7 @@ export function Stepper({
       style={[
         styles.container,
         {
-          height: theme.sizes.controlLg,
+          height: size === 'action' ? 72 : theme.sizes.controlLg,
           borderRadius: theme.radius.md,
           backgroundColor: theme.colors.bgSunken,
           borderColor: theme.colors.border,
@@ -115,7 +118,13 @@ export function Stepper({
         disabled={!onPressValue}
         accessibilityLabel={`Edit ${accessibilityLabel}`}
         style={({ pressed }) => [styles.middle, pressed && onPressValue && { opacity: 0.6 }]}>
-        <Text variant={isPrimary ? 'monoLarge' : 'mono'} color={isPrimary ? 'text' : 'textSecondary'} style={styles.value}>
+        <Text
+          variant={size === 'action' && isPrimary ? 'monoAction' : isPrimary ? 'monoLarge' : 'mono'}
+          color={isPrimary ? 'text' : 'textSecondary'}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          style={styles.value}>
           {display}
         </Text>
         {unit ? (

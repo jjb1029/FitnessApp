@@ -97,6 +97,9 @@ export const typography = {
   label: { fontSize: 13, lineHeight: 18, fontWeight: '600', letterSpacing: 0.4 },
   mono: { fontSize: 17, lineHeight: 22, fontWeight: '600', fontVariant: ['tabular-nums'] },
   monoLarge: { fontSize: 28, lineHeight: 34, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  /** The number the user is about to act on: the loudest thing on the workout screen. */
+  monoAction: { fontSize: 32, lineHeight: 38, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
+  /** The rest countdown, which owns the screen while it runs. */
   monoDisplay: { fontSize: 44, lineHeight: 50, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
 } as const satisfies Record<string, TextStyle>;
 export type TypographyName = keyof typeof typography;

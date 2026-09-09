@@ -1,4 +1,4 @@
-import { finishVerdict, gradeSet, setAcknowledgement, targetLine, todayLine, whyTitle } from './voice';
+import { arrivalLine, finishVerdict, gradeSet, setAcknowledgement, targetLine, todayLine, whyTitle } from './voice';
 
 const range = { min: 8, max: 12 };
 
@@ -42,23 +42,36 @@ describe('voice · lines', () => {
     expect(targetLine({ ruleId: 'progression.layoff', loadDisplay: '70 lb', previousLoadDisplay: '80 lb', reps: 8, targetRir: 2, isBodyweight: false })).toBe('70 lb today. Eased after time off.');
   });
 
+  it('speaks up only when Forma did something worth knowing', () => {
+    const t = { loadDisplay: '80 lb', previousLoadDisplay: '75 lb', reps: 8, targetRir: 2, isBodyweight: false };
+    // Ordinary decisions stay quiet: the line is the target sentence, tone neutral.
+    expect(arrivalLine({ ...t, ruleId: 'progression.double.add_rep', firstTimeAtLoad: false })).toEqual({ line: targetLine({ ...t, ruleId: 'progression.double.add_rep' }), tone: 'neutral' });
+    // Forma changing its own jumps is a moment.
+    expect(arrivalLine({ ...t, ruleId: 'progression.calibrate', firstTimeAtLoad: false })).toMatchObject({ tone: 'accent' });
+    expect(arrivalLine({ ...t, ruleId: 'progression.calibrate', firstTimeAtLoad: false }).line).toMatch(/jumps bigger/);
+    // Easing the weight unprompted is a moment.
+    expect(arrivalLine({ ...t, ruleId: 'progression.reduce_load', firstTimeAtLoad: false }).line).toMatch(/eased this to 80 lb/);
+    // A weight never lifted before is a moment, stated before the set.
+    expect(arrivalLine({ ...t, ruleId: 'progression.double.increase_load', firstTimeAtLoad: true })).toEqual({ line: 'First time at 80 lb. Get 8 and it stays.', tone: 'accent' });
+  });
+
   it('titles the Why sheet with the decision', () => {
     expect(whyTitle({ ruleId: 'progression.double.increase_load', loadDisplay: '80 lb', when: 'today', isBodyweight: false })).toBe('80 lb today');
     expect(whyTitle({ ruleId: 'progression.hold_after_miss', loadDisplay: '75 lb', when: 'next time', isBodyweight: false })).toBe('Hold at 75 lb');
     expect(whyTitle({ ruleId: 'progression.seed', loadDisplay: null, when: 'today', isBodyweight: false })).toBe('Starting load');
   });
 
-  it('gives a finish verdict from the session data', () => {
-    expect(finishVerdict({ workingSets: 12, allTargetsHit: true, increases: 2, earlyFinish: false, prCount: 0 })).toBe('Every target hit. 2 lifts go up next time.');
-    expect(finishVerdict({ workingSets: 12, allTargetsHit: false, increases: 0, earlyFinish: false, prCount: 1 })).toBe('You got stronger today.');
-    expect(finishVerdict({ workingSets: 3, allTargetsHit: true, increases: 0, earlyFinish: true, prCount: 0 })).toBe('Good stopping point. Nothing is lost.');
-    expect(finishVerdict({ workingSets: 0, allTargetsHit: false, increases: 0, earlyFinish: true, prCount: 0 })).toMatch(/Nothing logged/);
+  it('gives a finish verdict that leads and a detail that promises', () => {
+    expect(finishVerdict({ workingSets: 12, allTargetsHit: true, increases: 2, earlyFinish: false, prCount: 0 })).toEqual({ headline: 'Every target hit.', detail: '2 lifts go up next time.' });
+    expect(finishVerdict({ workingSets: 12, allTargetsHit: false, increases: 1, earlyFinish: false, prCount: 1 })).toEqual({ headline: 'You got stronger today.', detail: 'One lift goes up next time.' });
+    expect(finishVerdict({ workingSets: 3, allTargetsHit: true, increases: 0, earlyFinish: true, prCount: 0 })).toEqual({ headline: 'Good stopping point.', detail: 'Nothing is lost.' });
+    expect(finishVerdict({ workingSets: 0, allTargetsHit: false, increases: 0, earlyFinish: true, prCount: 0 }).headline).toMatch(/Nothing logged/);
   });
 
   it('writes the Today sentence', () => {
     expect(todayLine({ focus: ['Chest', 'Lats'], increases: [{ name: 'Incline press', loadDisplay: '80 lb' }], firstSession: false, welcomeBackPercent: null })).toBe('Chest and lats. Incline press goes up to 80 lb.');
     expect(todayLine({ focus: ['Quads', 'Hamstrings', 'Calves'], increases: [], firstSession: false, welcomeBackPercent: null })).toBe('Quads, hamstrings, and calves. Same weights as last time. Add a rep where you can.');
-    expect(todayLine({ focus: [], increases: [], firstSession: true, welcomeBackPercent: null })).toBe('Your first session. Find your weights and I will take it from there.');
+    expect(todayLine({ focus: [], increases: [], firstSession: true, welcomeBackPercent: null })).toBe("Your first session. Find your weights and I'll take it from there.");
     expect(todayLine({ focus: ['Chest'], increases: [], firstSession: false, welcomeBackPercent: 10 })).toMatch(/eased today's loads by 10%/);
   });
 });

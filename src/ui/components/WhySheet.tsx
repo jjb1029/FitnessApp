@@ -28,10 +28,10 @@ export type WhySheetProps = {
 };
 
 /**
- * The single renderer for every Explanation (docs/12, docs/14 §2). Forma
- * explaining its thinking: Tier 1 is the reason plus what would change its
- * mind; "Show more" reveals what it saw and how it decides; "Where this comes
- * from" lists the knowledge behind the rule.
+ * The single renderer for every Explanation (docs/12, docs/15 §3). Ordered
+ * the way a person answers the question: the decision, what I saw, and what
+ * would change my mind. How the rule works sits one tap further in, because
+ * the user asked why we are doing this, not how the software works.
  */
 export function WhySheet({ visible, onClose, title, explanation, knowledgeItems = [] }: WhySheetProps) {
   const theme = useTheme();
@@ -48,24 +48,32 @@ export function WhySheet({ visible, onClose, title, explanation, knowledgeItems 
           <Text variant="body">{explanation.short}</Text>
 
           {explanation.factors.length > 0 ? (
-            <View style={[styles.factors, { backgroundColor: theme.colors.bgSunken, borderRadius: theme.radius.md, padding: theme.spacing.md }]}>
-              {explanation.factors.map((f) => (
-                <View key={f.label} style={styles.factorRow} accessible accessibilityLabel={`${f.label}, ${f.value}${f.unit ? ` ${f.unit}` : ''}`}>
-                  <Text variant="caption" color="textSecondary" style={styles.factorLabel}>
-                    {f.label}
-                  </Text>
-                  <Text variant="mono">
-                    {f.value}
-                    {f.unit ? ` ${f.unit}` : ''}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <Section title="What I saw">
+              <View style={[styles.factors, { backgroundColor: theme.colors.bgSunken, borderRadius: theme.radius.md, padding: theme.spacing.md }]}>
+                {explanation.factors.map((f) => (
+                  <View key={f.label} style={styles.factorRow} accessible accessibilityLabel={`${f.label}, ${f.value}${f.unit ? ` ${f.unit}` : ''}`}>
+                    <Text variant="caption" color="textSecondary" style={styles.factorLabel}>
+                      {f.label}
+                    </Text>
+                    <Text variant="mono">
+                      {f.value}
+                      {f.unit ? ` ${f.unit}` : ''}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Section>
           ) : null}
 
           {explanation.counterfactual ? (
             <Section title="What changes my mind">
               <Text variant="callout">{explanation.counterfactual}</Text>
+            </Section>
+          ) : null}
+
+          {explanation.overrideNote ? (
+            <Section title="What you taught me">
+              <Text variant="callout">{explanation.overrideNote}</Text>
             </Section>
           ) : null}
 
@@ -95,7 +103,7 @@ function Tier2({ explanation }: { explanation: Explanation }) {
   return (
     <View style={{ gap: theme.spacing.lg }}>
       {explanation.evidence.length > 0 ? (
-        <Section title="What I saw">
+        <Section title="The sets I looked at">
           {explanation.evidence.map((e, i) => (
             <View key={`${e.kind}-${i}`} style={styles.evidenceRow}>
               {'date' in e ? (
@@ -126,11 +134,6 @@ function Tier2({ explanation }: { explanation: Explanation }) {
               </Text>
             </View>
           ))}
-        </Section>
-      ) : null}
-      {explanation.overrideNote ? (
-        <Section title="What you taught me">
-          <Text variant="callout">{explanation.overrideNote}</Text>
         </Section>
       ) : null}
     </View>

@@ -1,4 +1,3 @@
-import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
@@ -6,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getExerciseMap, getProfile, type LoadedExercise } from '@/data/repositories';
 import type { EquipmentId, Exercise, Explanation } from '@/domain';
-import { REST_UP_LINE, primaryLoad, setLine, suggestWarmups, targetLine, whyTitle } from '@/engine';
+import { REST_UP_LINE, arrivalLine, primaryLoad, suggestWarmups, targetLine, whyTitle } from '@/engine';
 import { formatDuration } from '@/lib/dates';
 import { displayLoad, incrementStepInUnit, trimNumber, unitToKg } from '@/lib/units';
 import { haptics } from '@/services/haptics';
@@ -17,12 +16,14 @@ import { ErrorState, IconButton, NumericKeypad, ProgressBar, Skeleton, Text, use
 import { useCurrentUser } from '../app/UserProvider';
 import { useNow } from '../app/useNow';
 import { ExerciseBlock } from './ExerciseBlock';
-import { InputDock } from './InputDock';
+import { InputDock, type DockLine } from './InputDock';
+import { useScreenAwake } from './useScreenAwake';
 import { SummaryView } from './SummaryView';
 import { AddExerciseSheet, ConfirmSheet, ExerciseInfoSheet, ExerciseMenuSheet, NoteSheet, RirSheet, SessionMenuSheet, SkipSheet, SwapSheet } from './sheets';
-import { isBodyweightExercise } from './format';
+import { effortLabel, effortValue, isBodyweightExercise } from './format';
 
 const REST_UP_LINGER_MS = 2000;
+const ARRIVAL_MS = 5000;
 
 export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   const theme = useTheme();
@@ -35,13 +36,13 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   const store = useSessionStore();
   const now = useNow(250);
   const listRef = useRef<FlatList<LoadedExercise>>(null);
-  const [dockHeight, setDockHeight] = useState(200);
+  const [dockHeight, setDockHeight] = useState(220);
   const [catalog, setCatalog] = useState<Exercise[]>([]);
   const [returnKey, setReturnKey] = useState(0);
   const [sheet, setSheet] = useState<null | 'rir' | 'keypad-load' | 'keypad-reps' | 'why' | 'swap' | 'note' | 'skip' | 'menu' | 'info' | 'session' | 'add' | 'finish' | 'discard'>(null);
   const [whyTarget, setWhyTarget] = useState<{ title: string; explanation: Explanation } | null>(null);
 
-  useKeepAwake(keepAwake ? 'workout' : undefined);
+  useScreenAwake(keepAwake);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,12 +60,25 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   }, [sessionId, user.id]);
 
   const loaded = store.loaded;
+  const current = loaded?.exercises.find((e) => e.id === store.currentExerciseId) ?? null;
+
+  const formatLoadDisplay = useCallback(
+    (kg: number | null): string | null => {
+      if (kg === null || !current) return null;
+      const bw = isBodyweightExercise(current.exercise);
+      if (bw && kg <= 0) return null;
+      const value = trimNumber(displayLoad(kg, unit, current.exercise.incrementKg));
+      return bw ? `+${value} ${unit}` : `${value} ${unit}`;
+    },
+    [current, unit],
+  );
 
   // ---- Rest rhythm: ticks in the last three seconds, "Rest's up." at zero, then back to lifting.
   const rest = store.rest;
   const remainingSec = rest ? Math.ceil((rest.endsAt - now) / 1000) : null;
   const restEnded = rest !== null && remainingSec !== null && remainingSec <= 0;
   const restEndsAt = rest?.endsAt ?? null;
+  const restActive = rest !== null;
   const tickedFor = useRef<string | null>(null);
   useEffect(() => {
     if (rest === null || remainingSec === null || restEnded) return;
@@ -82,7 +96,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
     if (endedFor.current !== restEndsAt) {
       endedFor.current = restEndsAt;
       haptics.medium();
-      useSessionStore.getState().setMoment(REST_UP_LINE, 'accent', REST_UP_LINGER_MS + 500);
+      useSessionStore.getState().setMoment(REST_UP_LINE, 'accent', REST_UP_LINGER_MS);
     }
     const t = setTimeout(() => {
       useSessionStore.getState().skipRest();
@@ -90,6 +104,29 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
     }, REST_UP_LINGER_MS);
     return () => clearTimeout(t);
   }, [restEnded, restEndsAt]);
+
+  // ---- Arrival: Forma speaks up only when it did something worth knowing (docs/15 §5).
+  // Held back while resting so it lands when the user returns to the action.
+  const announcedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!current || restActive) return;
+    if (announcedFor.current === current.id) return;
+    announcedFor.current = current.id;
+    if (current.sets.length > 0) return;
+    const snap = current.targetSnapshot;
+    const best = store.bests[current.exercise.id] ?? null;
+    const arrival = arrivalLine({
+      ruleId: snap.explanation.ruleId,
+      loadDisplay: formatLoadDisplay(snap.suggestedLoadKg),
+      previousLoadDisplay: formatLoadDisplay(primaryLoad(store.previous[current.exercise.id] ?? [])),
+      reps: snap.suggestedReps ?? snap.repRange.min,
+      targetRir: snap.targetRir,
+      isBodyweight: isBodyweightExercise(current.exercise),
+      firstTimeAtLoad: snap.suggestedLoadKg !== null && best !== null && snap.suggestedLoadKg > best + 0.01,
+    });
+    if (arrival.tone === 'accent') useSessionStore.getState().setMoment(arrival.line, 'accent', ARRIVAL_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, restActive]);
 
   // ---- Keep the current exercise at the top when it changes.
   const currentIndex = loaded?.exercises.findIndex((e) => e.id === store.currentExerciseId) ?? -1;
@@ -101,7 +138,6 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
     return undefined;
   }, [currentIndex, loaded, theme.reduceMotion]);
 
-  const current = loaded?.exercises.find((e) => e.id === store.currentExerciseId) ?? null;
   const nextPendingId = loaded?.exercises.find((e) => e.id !== store.currentExerciseId && !isExerciseDone(e))?.id ?? null;
   const availableEquipment = useMemo(() => new Set<EquipmentId>(catalog.flatMap((c) => c.equipmentIds)), [catalog]);
   const allDone = loaded ? loaded.exercises.every(isExerciseDone) : false;
@@ -109,19 +145,34 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   const totalDone = loaded ? loaded.exercises.reduce((a, e) => a + e.sets.filter((s) => s.setType === 'working').length, 0) : 0;
   const elapsed = loaded ? Math.max(0, (now - Date.parse(loaded.session.startedAt)) / 1000) : 0;
   const resting = rest !== null && (remainingSec === null || remainingSec > 0 || restEnded);
-  const phase = allDone ? 'Last exercise done' : resting ? 'Resting' : 'Lifting';
+  const phase = allDone ? 'Last one done' : resting ? 'Resting' : 'Lifting';
 
-  // ---- Forma's target sentence for the dock, from the snapshot the engine wrote.
-  const targetSentence = useMemo(() => {
-    if (!current) return '';
-    const workingDone = current.sets.filter((s) => s.setType === 'working').length;
-    if (workingDone > 0) return setLine(workingDone + 1, current.targetSnapshot.workingSets);
+  // ---- The dock's one line slot: Forma's moment, the decision, or the quiet basis.
+  const moment = store.moment;
+  const momentActive = moment !== null && now < moment.until;
+  const dockLine: DockLine = useMemo(() => {
+    if (momentActive && moment) return { text: moment.line, tone: moment.tone, emphasis: 'moment' };
+    if (!current) return { text: '', tone: 'neutral', emphasis: 'quiet' };
+    if (store.draft?.setId) return { text: 'Editing this set.', tone: 'neutral', emphasis: 'quiet' };
     const snap = current.targetSnapshot;
-    const bw = isBodyweightExercise(current.exercise);
-    const prev = primaryLoad(store.previous[current.exercise.id] ?? []);
-    const fmt = (kg: number | null) => (kg === null ? null : bw ? (kg > 0 ? `+${trimNumber(displayLoad(kg, unit, current.exercise.incrementKg))} ${unit}` : '') : `${trimNumber(displayLoad(kg, unit, current.exercise.incrementKg))} ${unit}`);
-    return targetLine({ ruleId: snap.explanation.ruleId, loadDisplay: fmt(snap.suggestedLoadKg), previousLoadDisplay: fmt(prev), reps: snap.suggestedReps ?? snap.repRange.min, targetRir: snap.targetRir, isBodyweight: bw });
-  }, [current, store.previous, unit]);
+    const workingDone = current.sets.filter((s) => s.setType === 'working').length;
+    if (workingDone === 0) {
+      return {
+        text: targetLine({
+          ruleId: snap.explanation.ruleId,
+          loadDisplay: formatLoadDisplay(snap.suggestedLoadKg),
+          previousLoadDisplay: formatLoadDisplay(primaryLoad(store.previous[current.exercise.id] ?? [])),
+          reps: snap.suggestedReps ?? snap.repRange.min,
+          targetRir: snap.targetRir,
+          isBodyweight: isBodyweightExercise(current.exercise),
+        }),
+        tone: 'neutral',
+        emphasis: 'decision',
+      };
+    }
+    const planned = Math.max(snap.workingSets, workingDone + 1);
+    return { text: `Set ${workingDone + 1} of ${planned} · ${snap.repRange.min}–${snap.repRange.max} reps · ${effortValue(snap.targetRir, scale)} ${effortLabel(scale)}`, tone: 'neutral', emphasis: 'quiet' };
+  }, [momentActive, moment, current, store.draft?.setId, store.previous, formatLoadDisplay, scale]);
 
   const warmupHint = useMemo(() => {
     if (!current || !store.draft || store.draft.load === null || current.sets.length > 0) return null;
@@ -133,11 +184,12 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   const openWhy = useCallback(() => {
     if (!current) return;
     const snap = current.targetSnapshot;
-    const bw = isBodyweightExercise(current.exercise);
-    const load = snap.suggestedLoadKg === null ? null : bw ? (snap.suggestedLoadKg > 0 ? `+${trimNumber(displayLoad(snap.suggestedLoadKg, unit, current.exercise.incrementKg))} ${unit}` : '') : `${trimNumber(displayLoad(snap.suggestedLoadKg, unit, current.exercise.incrementKg))} ${unit}`;
-    setWhyTarget({ title: whyTitle({ ruleId: snap.explanation.ruleId, loadDisplay: load, when: 'today', isBodyweight: bw }), explanation: snap.explanation });
+    setWhyTarget({
+      title: whyTitle({ ruleId: snap.explanation.ruleId, loadDisplay: formatLoadDisplay(snap.suggestedLoadKg), when: 'today', isBodyweight: isBodyweightExercise(current.exercise) }),
+      explanation: snap.explanation,
+    });
     setSheet('why');
-  }, [current, unit]);
+  }, [current, formatLoadDisplay]);
 
   const finish = async (early: boolean) => {
     setSheet(null);
@@ -160,6 +212,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
         summary={store.finished.summary}
         nextTime={store.finished.nextTime}
         exercises={loaded.exercises}
+        previous={store.previous}
         early={store.finished.early}
         unit={unit}
         onDone={async (note) => {
@@ -250,8 +303,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
           now={now}
           restEnded={restEnded}
           returnKey={returnKey}
-          moment={store.moment}
-          targetSentence={targetSentence}
+          line={dockLine}
           allDone={allDone}
           onChange={store.updateDraft}
           onBump={haptics.selection}
@@ -293,6 +345,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
         onSwap={async (to, reason, scope) => {
           if (!current) return;
           setSheet(null);
+          announcedFor.current = null;
           await store.swap(current.id, to, reason, scope);
         }}
         onClose={() => setSheet(null)}

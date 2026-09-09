@@ -51,6 +51,7 @@ export function formatDuration(seconds: number): string {
 }
 
 export function formatMinutes(seconds: number): string {
+  if (seconds < 60) return 'Under a minute';
   return `${Math.round(seconds / 60)} min`;
 }
 

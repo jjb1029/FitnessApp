@@ -5,13 +5,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { LoadedExercise } from '@/data/repositories';
 import type { IntensityScale, WeightUnit } from '@/domain';
-import { ENTER_WEIGHT_LINE } from '@/engine';
 import { formatDuration } from '@/lib/dates';
 import { incrementStepInUnit, trimNumber } from '@/lib/units';
-import type { Draft, Moment, RestState } from '@/store/sessionStore';
+import type { Draft, RestState } from '@/store/sessionStore';
 import { Button, ProgressBar, Stepper, Text, useTheme, type ColorName } from '@/ui';
 
 import { effortLabel, effortValue, isBodyweightExercise } from './format';
+
+/**
+ * `moment` is Forma speaking because something happened, `decision` is the
+ * target it chose, `quiet` is plain reference while the user works.
+ */
+export type DockLine = { text: string; tone: 'neutral' | 'success' | 'accent'; emphasis: 'moment' | 'decision' | 'quiet' };
 
 export type InputDockProps = {
   exercise: LoadedExercise | null;
@@ -24,9 +29,8 @@ export type InputDockProps = {
   restEnded: boolean;
   /** Changes each time rest ends; triggers the one-time highlight on Complete set. */
   returnKey: number;
-  moment: Moment | null;
-  /** Forma's sentence about the current target. */
-  targetSentence: string;
+  /** The single line slot: Forma's moment when it has something to say, the basis otherwise. */
+  line: DockLine;
   allDone: boolean;
   onChange: (patch: Partial<Pick<Draft, 'load' | 'reps' | 'rir'>>) => void;
   onBump: () => void;
@@ -42,28 +46,27 @@ export type InputDockProps = {
 };
 
 /**
- * The sticky bottom dock (docs/13 §W1, docs/14 §3). Two modes: lifting, where
- * the fields and Complete set lead; and recovery, where the countdown leads,
- * the fields dim, and the next set waits. Same controls, same positions, so
- * logging never gets slower.
+ * The current action (docs/15 §3). This surface answers "what am I doing
+ * right now": the exercise, the numbers, and one button. It owns the
+ * exercise's identity so the answer is a single unit, and the numbers are
+ * the largest thing on the screen because they are what the user acts on.
+ *
+ * While resting the same surface becomes recovery: the countdown leads, the
+ * fields dim but stay usable, and the next set waits underneath.
  */
 export function InputDock(p: InputDockProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { exercise, draft, unit, scale, rest, moment, now } = p;
+  const { exercise, draft, unit, scale, rest, line, now } = p;
   const bodyweight = exercise ? isBodyweightExercise(exercise.exercise) : false;
   const step = exercise ? incrementStepInUnit(exercise.exercise.incrementKg, unit) : 5;
   const editing = draft?.setId !== null && draft?.setId !== undefined;
-  const remainingMs = rest ? rest.endsAt - now : 0;
-  const remaining = Math.max(0, Math.ceil(remainingMs / 1000));
+  const remaining = rest ? Math.max(0, Math.ceil((rest.endsAt - now) / 1000)) : 0;
   const resting = rest !== null && (remaining > 0 || p.restEnded);
-  const momentActive = moment !== null && now < moment.until;
   const lastSeconds = resting && !p.restEnded && remaining <= 3;
-
   const needsWeight = draft !== null && draft.load === null && exercise?.exercise.loadType === 'external';
-  const contextLine = editing ? 'Editing this set.' : needsWeight ? ENTER_WEIGHT_LINE : p.targetSentence;
-  const lineColor: ColorName = momentActive ? (moment.tone === 'success' ? 'success' : moment.tone === 'accent' ? 'accent' : 'text') : 'textSecondary';
 
+  const lineColor: ColorName = line.tone === 'success' ? 'success' : line.tone === 'accent' ? 'accent' : line.emphasis === 'quiet' ? 'textSecondary' : 'text';
   const nextPreview = draft && exercise ? nextSetPreview(draft, exercise, unit, bodyweight) : null;
 
   return (
@@ -80,8 +83,8 @@ export function InputDock(p: InputDockProps) {
       {resting ? (
         <View style={styles.recovery} accessibilityLiveRegion="polite">
           <View style={styles.recoveryTop}>
-            <Text variant="callout" color={momentActive ? lineColor : p.restEnded ? 'accent' : 'textSecondary'} style={{ flex: 1, fontWeight: momentActive || p.restEnded ? '600' : '400' }} numberOfLines={1}>
-              {momentActive ? moment.line : p.restEnded ? "Rest's up." : 'Rest'}
+            <Text variant="callout" color={p.restEnded || line.emphasis === 'moment' ? lineColor : 'textSecondary'} style={{ flex: 1, fontWeight: p.restEnded || line.emphasis === 'moment' ? '600' : '400' }} numberOfLines={1}>
+              {line.emphasis === 'moment' ? line.text : 'Rest'}
             </Text>
             <Pressable onPress={p.onSkipRest} accessibilityRole="button" accessibilityLabel="Skip rest" hitSlop={8} style={styles.skip}>
               <Text variant="callout" color="textSecondary" style={{ fontWeight: '600' }}>
@@ -90,7 +93,7 @@ export function InputDock(p: InputDockProps) {
             </Pressable>
           </View>
           <View style={styles.countdownRow}>
-            <Text variant="monoDisplay" color={p.restEnded ? 'accent' : lastSeconds ? 'accent' : 'text'} accessibilityLabel={`${remaining} seconds remaining`}>
+            <Text variant="monoDisplay" color={p.restEnded || lastSeconds ? 'accent' : 'text'} accessibilityLabel={`${remaining} seconds remaining`}>
               {p.restEnded ? '0:00' : formatDuration(remaining)}
             </Text>
             <View style={styles.adjust}>
@@ -114,24 +117,34 @@ export function InputDock(p: InputDockProps) {
           ) : null}
         </View>
       ) : (
-        <View style={styles.contextRow}>
-          <Text variant="callout" color={lineColor} numberOfLines={1} style={{ flex: 1, fontWeight: momentActive ? '600' : '400' }}>
-            {momentActive ? moment.line : contextLine}
+        <View style={styles.action}>
+          <View style={styles.identityRow}>
+            <Text variant="headline" numberOfLines={1} style={{ flex: 1 }}>
+              {exercise?.exercise.name ?? ''}
+            </Text>
+            {exercise && !editing ? (
+              <Pressable onPress={p.onWhy} accessibilityRole="button" accessibilityLabel="Why this target" hitSlop={8} style={styles.door}>
+                <Text variant="callout" color="accent" style={{ fontWeight: '600' }}>
+                  Why?
+                </Text>
+              </Pressable>
+            ) : null}
+            {editing ? (
+              <Pressable onPress={p.onCancelEdit} accessibilityRole="button" hitSlop={8} style={styles.door}>
+                <Text variant="callout" color="accent" style={{ fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <Text
+            variant={line.emphasis === 'quiet' ? 'caption' : 'callout'}
+            color={lineColor}
+            numberOfLines={1}
+            style={{ fontWeight: line.emphasis === 'moment' ? '600' : '400' }}
+            accessibilityLiveRegion={line.emphasis === 'moment' ? 'polite' : 'none'}>
+            {line.text}
           </Text>
-          {exercise && !editing && !momentActive ? (
-            <Pressable onPress={p.onWhy} accessibilityRole="button" accessibilityLabel="Why this target" hitSlop={8} style={styles.why}>
-              <Text variant="callout" color="accent" style={{ fontWeight: '600' }}>
-                Why?
-              </Text>
-            </Pressable>
-          ) : null}
-          {editing ? (
-            <Pressable onPress={p.onCancelEdit} accessibilityRole="button" hitSlop={8} style={styles.why}>
-              <Text variant="callout" color="accent" style={{ fontWeight: '600' }}>
-                Cancel
-              </Text>
-            </Pressable>
-          ) : null}
         </View>
       )}
 
@@ -144,19 +157,33 @@ export function InputDock(p: InputDockProps) {
               onBump={p.onBump}
               step={step}
               min={0}
+              size='action'
               unit={bodyweight ? `+${unit}` : unit}
               formatValue={(v) => (draft.load === null ? '—' : trimNumber(v))}
               onPressValue={() => p.onOpenKeypad('load')}
               accessibilityLabel={bodyweight ? 'Added weight' : 'Weight'}
               muted={resting}
-              style={{ flex: 42 }}
+              style={{ flex: 46 }}
             />
-            <Stepper value={draft.reps} onChange={(v) => p.onChange({ reps: v })} onBump={p.onBump} step={1} min={0} max={100} unit={exercise.exercise.laterality === 'unilateral' ? 'reps / side' : 'reps'} onPressValue={() => p.onOpenKeypad('reps')} accessibilityLabel="Reps" muted={resting} style={{ flex: 34 }} />
+            <Stepper
+              value={draft.reps}
+              onChange={(v) => p.onChange({ reps: v })}
+              onBump={p.onBump}
+              step={1}
+              min={0}
+              max={100}
+              size='action'
+              unit={exercise.exercise.laterality === 'unilateral' ? 'reps / side' : 'reps'}
+              onPressValue={() => p.onOpenKeypad('reps')}
+              accessibilityLabel="Reps"
+              muted={resting}
+              style={{ flex: 32 }}
+            />
             <Pressable
               onPress={p.onOpenRir}
               accessibilityRole="button"
               accessibilityLabel={`${effortLabel(scale)} ${draft.rir === null ? 'not set' : effortValue(draft.rir, scale)}`}
-              style={({ pressed }) => [styles.rir, { flex: 24, height: theme.sizes.controlLg, borderRadius: theme.radius.md, backgroundColor: pressed ? theme.colors.border : theme.colors.bgSunken, borderColor: theme.colors.border, opacity: resting ? 0.6 : 1 }]}>
+              style={({ pressed }) => [styles.rir, { flex: 22, height: 72, borderRadius: theme.radius.md, backgroundColor: pressed ? theme.colors.border : theme.colors.bgSunken, borderColor: theme.colors.border, opacity: resting ? 0.6 : 1 }]}>
               <Text variant="mono" color="textSecondary">
                 {draft.rir === null ? '–' : effortValue(draft.rir, scale)}
               </Text>
@@ -195,8 +222,7 @@ export function InputDock(p: InputDockProps) {
 function nextSetPreview(draft: Draft, exercise: LoadedExercise, unit: WeightUnit, bodyweight: boolean): string {
   const load = draft.load === null ? (bodyweight ? 'BW' : '—') : bodyweight ? (draft.load > 0 ? `BW +${trimNumber(draft.load)} ${unit}` : 'BW') : `${trimNumber(draft.load)} ${unit}`;
   const setNo = exercise.sets.filter((s) => s.setType === 'working').length + 1;
-  const name = exercise.exercise.name;
-  return `${name} · set ${Math.min(setNo, exercise.targetSnapshot.workingSets)} · ${load} × ${draft.reps}`;
+  return `${exercise.exercise.name} · set ${Math.min(setNo, exercise.targetSnapshot.workingSets)} · ${load} × ${draft.reps}`;
 }
 
 /** One soft flash behind Complete set when rest ends, so the eye returns to the action. */
@@ -217,16 +243,17 @@ function ReturnHighlight({ returnKey, reduceMotion, tint, radius, children }: { 
 }
 
 const styles = StyleSheet.create({
-  dock: { paddingTop: 8, boxShadow: '0 -6px 18px rgba(0, 0, 0, 0.18)' },
-  contextRow: { flexDirection: 'row', alignItems: 'center', minHeight: 32, gap: 8 },
-  why: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 4 },
+  dock: { paddingTop: 10, boxShadow: '0 -6px 18px rgba(0, 0, 0, 0.18)' },
+  action: { gap: 2, paddingBottom: 2 },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
+  door: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 4 },
   recovery: { gap: 6, paddingBottom: 4 },
   recoveryTop: { flexDirection: 'row', alignItems: 'center', minHeight: 28, gap: 8 },
   skip: { minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center' },
   countdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   adjust: { flexDirection: 'row', gap: 8 },
   adjustBtn: { minHeight: 44, minWidth: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  fields: { flexDirection: 'row', alignItems: 'stretch', marginTop: 4 },
+  fields: { flexDirection: 'row', alignItems: 'stretch', marginTop: 6 },
   rir: { alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
   finishRow: { flexDirection: 'row', marginTop: 8 },
 });

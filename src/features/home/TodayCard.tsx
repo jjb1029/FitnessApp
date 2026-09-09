@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ActiveProgram } from '@/data/repositories';
 import type { SessionRow } from '@/data/schema';
-import type { TodayResolution } from '@/engine';
+import { readyLine, type TodayResolution } from '@/engine';
 import { formatDuration } from '@/lib/dates';
 import { muscleLabel } from '@/lib/labels';
 import { Button, Card, StatusPill, Text, useTheme } from '@/ui';
@@ -81,10 +81,6 @@ export function TodayCard({ active, today, inProgress, sentence, deferred, onSta
 
   const dayRow = active.days[today.dayIndex];
   const exercises = dayRow?.exercises ?? [];
-  const preview = exercises
-    .slice(0, 3)
-    .map((e) => e.exercise.name)
-    .join(' · ');
   const focus = (dayRow?.focusMuscleIds ?? []).slice(0, 3).map(muscleLabel);
 
   if (deferred) {
@@ -105,6 +101,7 @@ export function TodayCard({ active, today, inProgress, sentence, deferred, onSta
 
   const welcomeBack = today.kind === 'welcome_back';
 
+  // Decision, basis, door (docs/15 §2): today is ready, here is what it is, here is why.
   return (
     <Card tone="accent">
       <View style={styles.eyebrow}>
@@ -118,32 +115,22 @@ export function TodayCard({ active, today, inProgress, sentence, deferred, onSta
         </Pressable>
       </View>
       <Text variant="display" style={{ marginTop: 4 }}>
-        {today.day.name}
-      </Text>
-      <Text variant="callout" color="textSecondary" style={{ marginTop: 4 }}>
-        {exercises.length} exercises · about {dayRow?.estimatedMinutes ?? today.day.estimatedMinutes} min
+        {readyLine(today.day.name)}
       </Text>
       {sentence ? (
-        <Text variant="body" style={{ marginTop: theme.spacing.md }}>
+        <Text variant="body" color="textSecondary" style={{ marginTop: theme.spacing.sm }}>
           {sentence}
         </Text>
-      ) : welcomeBack ? (
-        <Text variant="body" style={{ marginTop: theme.spacing.md }}>
-          Welcome back. I have eased today&apos;s loads by {today.loadPercent}%.
-        </Text>
       ) : focus.length > 0 ? (
-        <View style={[styles.focus, { marginTop: theme.spacing.md }]}>
+        <View style={[styles.focus, { marginTop: theme.spacing.sm }]}>
           {focus.map((f) => (
             <StatusPill key={f} label={f} tone="accent" icon="ellipse" />
           ))}
         </View>
       ) : null}
-      {preview ? (
-        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ marginTop: theme.spacing.sm }}>
-          {preview}
-          {exercises.length > 3 ? ` · +${exercises.length - 3}` : ''}
-        </Text>
-      ) : null}
+      <Text variant="caption" color="textTertiary" style={{ marginTop: theme.spacing.sm }}>
+        {exercises.length} exercises · about {dayRow?.estimatedMinutes ?? today.day.estimatedMinutes} min
+      </Text>
       <Button label="Start workout" size="lg" fullWidth icon="play" onPress={onStart} style={{ marginTop: theme.spacing.lg }} />
       <View style={[styles.secondary, { marginTop: theme.spacing.xs }]}>
         <Button label="Do later" variant="ghost" onPress={onDefer} />
