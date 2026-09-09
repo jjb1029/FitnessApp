@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { features } from '@/config/flags';
 import { abandonSession, finishSession, loadSession, logBodyweight, setNextDayIndex, startSession } from '@/data/repositories';
-import { advanceDayIndex } from '@/engine';
+import { advanceDayIndex, readyLine } from '@/engine';
 import { greetingForHour, localDate, weeksSince } from '@/lib/dates';
 import { formatWeight, kgToUnit, unitToKg } from '@/lib/units';
 import { GOAL_LABEL } from '@/store/onboardingStore';
@@ -104,7 +104,7 @@ export function HomeScreen() {
         <View style={{ flex: 1 }}>
           <Text variant="title2">{greetingForHour(new Date().getHours())}</Text>
           <Text variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
-            {goal ? `${GOAL_LABEL[goal]} · Week ${week}` : 'Forma'}
+            {today && today.kind !== 'rest' && !inProgress ? `${readyLine(today.day.name)} · Week ${week}` : goal ? `${GOAL_LABEL[goal]} · Week ${week}` : 'Forma'}
           </Text>
         </View>
         <IconButton icon="person-circle-outline" accessibilityLabel="Settings" size={28} onPress={() => router.push('/settings')} />
@@ -122,6 +122,7 @@ export function HomeScreen() {
           <TodayCard
             active={active}
             today={today}
+            sentence={data?.todaySentence ?? null}
             inProgress={staleSession ? null : inProgress}
             deferred={deferred}
             onStart={startWorkout}

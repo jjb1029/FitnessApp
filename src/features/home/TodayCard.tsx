@@ -4,36 +4,17 @@ import type { ActiveProgram } from '@/data/repositories';
 import type { SessionRow } from '@/data/schema';
 import type { TodayResolution } from '@/engine';
 import { formatDuration } from '@/lib/dates';
+import { muscleLabel } from '@/lib/labels';
 import { Button, Card, StatusPill, Text, useTheme } from '@/ui';
 
 import { useNow } from '../app/useNow';
-
-const MUSCLE_LABEL: Record<string, string> = {
-  chest: 'Chest',
-  lats: 'Lats',
-  upper_back: 'Upper back',
-  traps: 'Traps',
-  front_delts: 'Shoulders',
-  side_delts: 'Side delts',
-  rear_delts: 'Rear delts',
-  biceps: 'Biceps',
-  triceps: 'Triceps',
-  forearms: 'Forearms',
-  quads: 'Quads',
-  hamstrings: 'Hamstrings',
-  glutes: 'Glutes',
-  adductors: 'Adductors',
-  calves: 'Calves',
-  abs: 'Abs',
-  obliques: 'Obliques',
-  spinal_erectors: 'Lower back',
-  neck: 'Neck',
-};
 
 export type TodayCardProps = {
   active: ActiveProgram | null;
   today: TodayResolution | null;
   inProgress: SessionRow | null;
+  /** Forma's sentence about today, from the engine's targets. */
+  sentence: string | null;
   deferred: boolean;
   onStart: () => void;
   onDefer: () => void;
@@ -43,7 +24,7 @@ export type TodayCardProps = {
 };
 
 /** The Home command centre (docs/13 §3). One card, five states. */
-export function TodayCard({ active, today, inProgress, deferred, onStart, onDefer, onUndefer, onSkip, onWhy }: TodayCardProps) {
+export function TodayCard({ active, today, inProgress, sentence, deferred, onStart, onDefer, onUndefer, onSkip, onWhy }: TodayCardProps) {
   const theme = useTheme();
   const now = useNow(30_000);
 
@@ -104,7 +85,7 @@ export function TodayCard({ active, today, inProgress, deferred, onStart, onDefe
     .slice(0, 3)
     .map((e) => e.exercise.name)
     .join(' · ');
-  const focus = (dayRow?.focusMuscleIds ?? []).slice(0, 3).map((m) => MUSCLE_LABEL[m] ?? m);
+  const focus = (dayRow?.focusMuscleIds ?? []).slice(0, 3).map(muscleLabel);
 
   if (deferred) {
     return (
@@ -142,7 +123,15 @@ export function TodayCard({ active, today, inProgress, deferred, onStart, onDefe
       <Text variant="callout" color="textSecondary" style={{ marginTop: 4 }}>
         {exercises.length} exercises · about {dayRow?.estimatedMinutes ?? today.day.estimatedMinutes} min
       </Text>
-      {focus.length > 0 ? (
+      {sentence ? (
+        <Text variant="body" style={{ marginTop: theme.spacing.md }}>
+          {sentence}
+        </Text>
+      ) : welcomeBack ? (
+        <Text variant="body" style={{ marginTop: theme.spacing.md }}>
+          Welcome back. I have eased today&apos;s loads by {today.loadPercent}%.
+        </Text>
+      ) : focus.length > 0 ? (
         <View style={[styles.focus, { marginTop: theme.spacing.md }]}>
           {focus.map((f) => (
             <StatusPill key={f} label={f} tone="accent" icon="ellipse" />
@@ -150,14 +139,9 @@ export function TodayCard({ active, today, inProgress, deferred, onStart, onDefe
         </View>
       ) : null}
       {preview ? (
-        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ marginTop: theme.spacing.md }}>
+        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ marginTop: theme.spacing.sm }}>
           {preview}
           {exercises.length > 3 ? ` · +${exercises.length - 3}` : ''}
-        </Text>
-      ) : null}
-      {welcomeBack ? (
-        <Text variant="callout" style={{ marginTop: theme.spacing.md }}>
-          Loads eased by {today.loadPercent}% to settle back in.
         </Text>
       ) : null}
       <Button label="Start workout" size="lg" fullWidth icon="play" onPress={onStart} style={{ marginTop: theme.spacing.lg }} />

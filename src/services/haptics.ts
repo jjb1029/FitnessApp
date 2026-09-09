@@ -9,9 +9,13 @@ function enabled(): boolean {
 }
 
 export const haptics = {
-  /** Set complete, stepper detents, timer end. */
+  /** Logged, stepper detents, last seconds of rest. */
   tick(): void {
     if (enabled()) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+  },
+  /** Target hit, rest start, rest end. */
+  medium(): void {
+    if (enabled()) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
   },
   /** A personal record. */
   success(): void {

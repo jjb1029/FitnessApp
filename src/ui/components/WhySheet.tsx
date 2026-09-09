@@ -20,7 +20,7 @@ export type KnowledgeItemSummary = {
 export type WhySheetProps = {
   visible: boolean;
   onClose: () => void;
-  /** Restates the recommendation, e.g. "Increase to 80 lb". */
+  /** The decision itself, e.g. "80 lb today" or "Hack squat instead". */
   title: string;
   explanation: Explanation | null;
   /** Resolved Tier 3 items; the sheet renders what it is given. */
@@ -28,9 +28,10 @@ export type WhySheetProps = {
 };
 
 /**
- * The single renderer for every Explanation (docs/12). Tier 1 by default,
- * Tier 2 on "Show details", Tier 3 on "Learn more". Screens never assemble
- * explanation text themselves.
+ * The single renderer for every Explanation (docs/12, docs/14 §2). Forma
+ * explaining its thinking: Tier 1 is the reason plus what would change its
+ * mind; "Show more" reveals what it saw and how it decides; "Where this comes
+ * from" lists the knowledge behind the rule.
  */
 export function WhySheet({ visible, onClose, title, explanation, knowledgeItems = [] }: WhySheetProps) {
   const theme = useTheme();
@@ -62,19 +63,25 @@ export function WhySheet({ visible, onClose, title, explanation, knowledgeItems 
             </View>
           ) : null}
 
+          {explanation.counterfactual ? (
+            <Section title="What changes my mind">
+              <Text variant="callout">{explanation.counterfactual}</Text>
+            </Section>
+          ) : null}
+
           {tier >= 2 ? <Tier2 explanation={explanation} /> : null}
           {tier >= 3 ? <Tier3 explanation={explanation} items={knowledgeItems} /> : null}
 
           <View style={[styles.actions, { gap: theme.spacing.sm }]}>
             <Button label="Got it" size="lg" fullWidth onPress={close} />
-            {tier === 1 ? <Button label="Show details" variant="ghost" onPress={() => setTier(2)} /> : null}
-            {tier === 2 ? <Button label="Learn more" variant="ghost" onPress={() => setTier(3)} /> : null}
+            {tier === 1 ? <Button label="Show more" variant="ghost" onPress={() => setTier(2)} /> : null}
+            {tier === 2 ? <Button label="Where this comes from" variant="ghost" onPress={() => setTier(3)} /> : null}
           </View>
         </ScrollView>
       ) : (
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="textSecondary">
-            No explanation is available for this value.
+            I do not have an explanation for this one.
           </Text>
           <Button label="Got it" size="lg" fullWidth onPress={close} />
         </View>
@@ -88,30 +95,29 @@ function Tier2({ explanation }: { explanation: Explanation }) {
   return (
     <View style={{ gap: theme.spacing.lg }}>
       {explanation.evidence.length > 0 ? (
-        <Section title="What I looked at">
+        <Section title="What I saw">
           {explanation.evidence.map((e, i) => (
             <View key={`${e.kind}-${i}`} style={styles.evidenceRow}>
-              <Text variant="caption" color="textTertiary" style={styles.evidenceDate}>
-                {'date' in e ? e.date : ''}
+              {'date' in e ? (
+                <Text variant="caption" color="textTertiary" style={styles.evidenceDate}>
+                  {e.date}
+                </Text>
+              ) : null}
+              <Text variant="callout" style={{ flex: 1 }}>
+                {e.label}
               </Text>
-              <Text variant="callout">{e.label}</Text>
             </View>
           ))}
         </Section>
       ) : null}
-      <Section title="The rule">
+      <Section title="How I decide">
         <Text variant="headline">{explanation.rule.name}</Text>
         <Text variant="callout" color="textSecondary">
           {explanation.rule.description}
         </Text>
       </Section>
-      {explanation.counterfactual ? (
-        <Section title="What would change this">
-          <Text variant="callout">{explanation.counterfactual}</Text>
-        </Section>
-      ) : null}
       {explanation.alternatives && explanation.alternatives.length > 0 ? (
-        <Section title="Other options considered">
+        <Section title="What else I considered">
           {explanation.alternatives.map((a) => (
             <View key={a.label} style={{ gap: 2 }}>
               <Text variant="callout">{a.label}</Text>
@@ -123,7 +129,7 @@ function Tier2({ explanation }: { explanation: Explanation }) {
         </Section>
       ) : null}
       {explanation.overrideNote ? (
-        <Section title="Your overrides">
+        <Section title="What you taught me">
           <Text variant="callout">{explanation.overrideNote}</Text>
         </Section>
       ) : null}
@@ -135,10 +141,10 @@ function Tier3({ explanation, items }: { explanation: Explanation; items: Knowle
   const theme = useTheme();
   return (
     <View style={{ gap: theme.spacing.lg }}>
-      <Section title="Learn more">
+      <Section title="Where this comes from">
         {items.length === 0 ? (
           <Text variant="callout" color="textSecondary">
-            No linked knowledge items yet.
+            The knowledge behind this rule is still being written up.
           </Text>
         ) : (
           items.map((item) => (

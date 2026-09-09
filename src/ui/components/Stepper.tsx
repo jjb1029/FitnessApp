@@ -18,6 +18,10 @@ export type StepperProps = {
   formatValue?: (value: number) => string;
   /** Visual weight: primary fields are bolder than optional ones. */
   emphasis?: 'primary' | 'secondary';
+  /** Called on every detent (each increment or decrement); the caller decides haptics. */
+  onBump?: () => void;
+  /** Dims the control without disabling it, e.g. during rest. */
+  muted?: boolean;
   accessibilityLabel: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -37,6 +41,8 @@ export function Stepper({
   onPressValue,
   formatValue,
   emphasis = 'primary',
+  onBump,
+  muted = false,
   accessibilityLabel,
   style,
   testID,
@@ -52,7 +58,10 @@ export function Stepper({
   const clamp = (n: number) => Math.min(max, Math.max(min, Number(n.toFixed(3))));
   const bump = (direction: 1 | -1) => {
     const next = clamp(valueRef.current + direction * step);
-    if (next !== valueRef.current) onChange(next);
+    if (next !== valueRef.current) {
+      onChange(next);
+      onBump?.();
+    }
   };
 
   const stopRepeat = () => {
@@ -81,6 +90,7 @@ export function Stepper({
           borderRadius: theme.radius.md,
           backgroundColor: theme.colors.bgSunken,
           borderColor: theme.colors.border,
+          opacity: muted ? 0.6 : 1,
         },
         style,
       ]}

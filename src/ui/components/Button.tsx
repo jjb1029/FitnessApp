@@ -67,6 +67,7 @@ export function Button({
           opacity: isDisabled ? 0.5 : 1,
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
           paddingHorizontal: variant === 'ghost' ? theme.spacing.sm : theme.spacing.xl,
+          transform: [{ scale: pressed && !theme.reduceMotion && variant !== 'ghost' ? 0.97 : 1 }],
         },
         style,
       ]}>

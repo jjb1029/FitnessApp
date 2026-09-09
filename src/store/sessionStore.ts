@@ -5,6 +5,7 @@ import {
   addSessionExercise,
   deleteSet as deleteSetRepo,
   finishSession as finishSessionRepo,
+  getExerciseHistory,
   loadSession,
   saveSet,
   swapSessionExercise,
@@ -16,8 +17,8 @@ import {
 } from '@/data/repositories';
 import type { PerformedSetRow, SessionExerciseRow } from '@/data/schema';
 import type { Exercise, Experience, SessionSummary, SkipReason, SwapReason, WeightUnit } from '@/domain';
-import type { PrResult } from '@/engine';
-import { displayLoad, unitToKg } from '@/lib/units';
+import { exerciseDoneLine, gradeSet, prLine, setAcknowledgement, type SetRecord } from '@/engine';
+import { displayLoad, kgToUnit, trimNumber, unitToKg } from '@/lib/units';
 import { haptics } from '@/services/haptics';
 import { cancelRestEnd, scheduleRestEnd } from '@/services/notifications';
 
@@ -37,7 +38,10 @@ export type Draft = {
 
 export type RestState = { endsAt: number; totalSeconds: number; notificationId: string | null; exerciseName: string };
 
-export type Finished = { summary: SessionSummary; nextTime: NextTimeRow[] };
+/** A transient line in the dock: Forma noticing something (docs/14 §2). */
+export type Moment = { line: string; tone: 'neutral' | 'success' | 'accent'; until: number };
+
+export type Finished = { summary: SessionSummary; nextTime: NextTimeRow[]; early: boolean };
 
 type SessionState = {
   loaded: LoadedSession | null;
@@ -46,7 +50,11 @@ type SessionState = {
   currentExerciseId: string | null;
   draft: Draft | null;
   rest: RestState | null;
-  lastPr: { exerciseName: string; pr: PrResult } | null;
+  moment: Moment | null;
+  /** The set that just landed; drives the one-time landing highlight. */
+  justLandedSetId: string | null;
+  /** Previous session's working sets per exercise id, for "last time" and better-than-last-time grading. */
+  previous: Record<string, SetRecord[]>;
   finished: Finished | null;
   unit: WeightUnit;
   experience: Experience;
@@ -73,7 +81,8 @@ type SessionState = {
   startRest: (seconds: number, exerciseName: string) => Promise<void>;
   adjustRest: (deltaSeconds: number) => void;
   skipRest: () => void;
-  finish: () => Promise<Finished | null>;
+  setMoment: (line: string, tone: Moment['tone'], durationMs: number) => void;
+  finish: (early: boolean) => Promise<Finished | null>;
   abandon: () => Promise<void>;
   saveSessionNotes: (notes: string | null) => Promise<void>;
 };
@@ -86,16 +95,20 @@ function firstPending(loaded: LoadedSession): string | null {
   return loaded.exercises.find((e) => !isDone(e))?.id ?? loaded.exercises[0]?.id ?? null;
 }
 
+function isBodyweight(e: LoadedExercise): boolean {
+  return e.exercise.loadType === 'bodyweight' || e.exercise.loadType === 'bodyweight_plus';
+}
+
 /** Prefill for the next pending set of an exercise (docs/13 §W1 prefill rules). */
 function draftFor(e: LoadedExercise, unit: WeightUnit): Draft {
   const working = e.sets.filter((s) => s.setType === 'working');
   const order = e.sets.length;
   const previous = working[working.length - 1];
   const snap = e.targetSnapshot;
-  const isBodyweight = e.exercise.loadType === 'bodyweight' || e.exercise.loadType === 'bodyweight_plus';
+  const bw = isBodyweight(e);
   const suggestedLoad = snap.suggestedLoadKg === null ? null : displayLoad(snap.suggestedLoadKg, unit, e.exercise.incrementKg);
   if (previous) {
-    const prevLoadKg = isBodyweight ? previous.addedLoadKg : previous.loadKg;
+    const prevLoadKg = bw ? previous.addedLoadKg : previous.loadKg;
     return {
       sessionExerciseId: e.id,
       setId: null,
@@ -113,7 +126,7 @@ function draftFor(e: LoadedExercise, unit: WeightUnit): Draft {
     setId: null,
     order,
     setType: 'working',
-    load: isBodyweight ? (suggestedLoad ?? 0) : suggestedLoad,
+    load: bw ? (suggestedLoad ?? 0) : suggestedLoad,
     reps: snap.suggestedReps ?? snap.repRange.min,
     rir: snap.targetRir,
     suggestedLoad,
@@ -132,7 +145,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   currentExerciseId: null,
   draft: null,
   rest: null,
-  lastPr: null,
+  moment: null,
+  justLandedSetId: null,
+  previous: {},
   finished: null,
   unit: 'lb',
   experience: 'intermediate',
@@ -142,13 +157,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   configure: (opts) => set(opts),
 
   load: async (sessionId) => {
-    set({ loading: true, error: null, finished: null });
+    set({ loading: true, error: null, finished: null, moment: null, justLandedSetId: null });
     try {
       const loaded = await loadSession(sessionId);
       if (!loaded) throw new Error('Session not found');
+      const previous: Record<string, SetRecord[]> = {};
+      for (const e of loaded.exercises) {
+        if (previous[e.exercise.id]) continue;
+        const history = await getExerciseHistory(get().userId, e.exercise.id, 1, sessionId);
+        previous[e.exercise.id] = history[0]?.sets ?? [];
+      }
       const currentExerciseId = firstPending(loaded);
       const current = loaded.exercises.find((e) => e.id === currentExerciseId);
-      set({ loaded, loading: false, currentExerciseId, draft: current ? draftFor(current, get().unit) : null });
+      set({ loaded, previous, loading: false, currentExerciseId, draft: current ? draftFor(current, get().unit) : null });
     } catch (e) {
       set({ loading: false, error: e instanceof Error ? e : new Error(String(e)) });
     }
@@ -157,7 +178,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   clear: () => {
     const { rest } = get();
     if (rest) cancelRestEnd(rest.notificationId).catch(() => undefined);
-    set({ loaded: null, currentExerciseId: null, draft: null, rest: null, lastPr: null, finished: null, error: null });
+    set({ loaded: null, currentExerciseId: null, draft: null, rest: null, moment: null, justLandedSetId: null, previous: {}, finished: null, error: null });
   },
 
   setCurrent: (id) => {
@@ -173,12 +194,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ draft: { ...draft, ...patch } });
   },
 
+  setMoment: (line, tone, durationMs) => set({ moment: { line, tone, until: Date.now() + durationMs } }),
+
   completeSet: async () => {
-    const { loaded, draft, unit, userId, autoStartRest } = get();
+    const { loaded, draft, unit, userId, autoStartRest, previous } = get();
     if (!loaded || !draft) return;
     const e = loaded.exercises.find((x) => x.id === draft.sessionExerciseId);
     if (!e) return;
-    const isBodyweight = e.exercise.loadType === 'bodyweight' || e.exercise.loadType === 'bodyweight_plus';
+    const bw = isBodyweight(e);
     const loadKg = draft.load === null ? null : unitToKg(draft.load, unit);
     const { row, pr } = await saveSet({
       sessionId: loaded.session.id,
@@ -190,8 +213,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       setType: draft.setType,
       enteredLoad: draft.load,
       enteredUnit: unit,
-      loadKg: isBodyweight ? null : loadKg,
-      addedLoadKg: isBodyweight ? (loadKg ?? 0) : null,
+      loadKg: bw ? null : loadKg,
+      addedLoadKg: bw ? (loadKg ?? 0) : null,
       reps: draft.reps,
       rir: draft.rir,
       suggestedLoadKg: draft.suggestedLoad === null ? null : unitToKg(draft.suggestedLoad, unit),
@@ -203,21 +226,37 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
     const updatedExercise = updatedLoaded.exercises.find((x) => x.id === e.id)!;
     const wasEdit = draft.setId !== null;
+    const isWorking = draft.setType === 'working';
+
+    // Grade the set against the target and against the same set last time.
+    const workingIndex = updatedExercise.sets.filter((s) => s.setType === 'working').findIndex((s) => s.id === row.id);
+    const previousSet = isWorking ? (previous[e.exercise.id]?.[workingIndex] ?? null) : null;
+    const outcome = gradeSet({ reps: draft.reps, loadKg, repRange: e.targetSnapshot.repRange, previous: previousSet, edit: wasEdit });
+    const setsRemaining = Math.max(0, updatedExercise.targetSnapshot.workingSets - (workingIndex + 1));
 
     if (pr.isPr) {
       haptics.success();
-      set({ lastPr: { exerciseName: e.exercise.name, pr } });
+      const e1rm = pr.e1rmKg !== null ? `${trimNumber(Math.round(kgToUnit(pr.e1rmKg, unit)))} ${unit}` : '';
+      const delta = pr.e1rmDeltaKg !== null && pr.e1rmDeltaKg > 0 ? `${trimNumber(Math.round(kgToUnit(pr.e1rmDeltaKg, unit)))} ${unit}` : null;
+      get().setMoment(prLine(e1rm, delta), 'accent', 3500);
+    } else if (isWorking) {
+      if (outcome === 'better' || outcome === 'above') haptics.success();
+      else if (outcome === 'hit') haptics.medium();
+      else haptics.tick();
+      get().setMoment(setAcknowledgement({ outcome, setIndex: workingIndex, setsRemaining }), outcome === 'better' || outcome === 'above' ? 'success' : 'neutral', 2500);
     } else {
       haptics.tick();
+      get().setMoment(wasEdit ? 'Updated.' : 'Warm-up logged.', 'neutral', 1500);
     }
 
     let nextId = e.id;
     if (!wasEdit && isDone(updatedExercise)) {
       const next = updatedLoaded.exercises.find((x) => !isDone(x));
       if (next) nextId = next.id;
+      else get().setMoment(exerciseDoneLine(e.exercise.name, null), 'accent', 3000);
     }
     const nextExercise = updatedLoaded.exercises.find((x) => x.id === nextId)!;
-    set({ loaded: updatedLoaded, currentExerciseId: nextId, draft: draftFor(nextExercise, unit) });
+    set({ loaded: updatedLoaded, currentExerciseId: nextId, draft: draftFor(nextExercise, unit), justLandedSetId: row.id });
 
     if (!wasEdit && autoStartRest) {
       const restSeconds = draft.setType === 'warmup' ? 60 : (e.restSecondsOverride ?? e.targetSnapshot.restSeconds);
@@ -230,8 +269,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const e = loaded?.exercises.find((x) => x.id === sessionExerciseId);
     const s = e?.sets.find((x) => x.id === setId);
     if (!e || !s) return;
-    const isBodyweight = e.exercise.loadType === 'bodyweight' || e.exercise.loadType === 'bodyweight_plus';
-    const kg = isBodyweight ? s.addedLoadKg : s.loadKg;
+    const kg = isBodyweight(e) ? s.addedLoadKg : s.loadKg;
     set({
       currentExerciseId: sessionExerciseId,
       draft: {
@@ -260,7 +298,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     await deleteSetRepo(setId);
     const updated = replaceExercise(loaded, sessionExerciseId, (x) => ({ ...x, sets: x.sets.filter((s) => s.id !== setId) }));
     const e = updated.exercises.find((x) => x.id === sessionExerciseId)!;
-    set({ loaded: updated, currentExerciseId: sessionExerciseId, draft: draftFor(e, unit) });
+    set({ loaded: updated, currentExerciseId: sessionExerciseId, draft: draftFor(e, unit), moment: null });
   },
 
   addSet: (sessionExerciseId, setType = 'working') => {
@@ -277,7 +315,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { loaded, unit, userId } = get();
     const e = loaded?.exercises.find((x) => x.id === sessionExerciseId);
     if (!loaded || !e) return;
-    // Insert warm-ups before working sets: orders 0..n-1, shift existing sets up.
     let updated = loaded;
     const shifted = e.sets.map((s) => ({ ...s, order: s.order + sets.length }));
     for (const s of shifted) {
@@ -291,6 +328,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     updated = replaceExercise(updated, sessionExerciseId, (x) => ({ ...x, sets: [...rows, ...shifted].sort((a, b) => a.order - b.order) }));
     const e2 = updated.exercises.find((x) => x.id === sessionExerciseId)!;
     set({ loaded: updated, currentExerciseId: sessionExerciseId, draft: draftFor(e2, unit) });
+    get().setMoment(`${rows.length} warm-up sets added.`, 'neutral', 2000);
   },
 
   skipExercise: async (sessionExerciseId, reason) => {
@@ -300,6 +338,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const updated = replaceExercise(loaded, sessionExerciseId, (x) => ({ ...x, skipped: true, skipReason: reason }));
     const next = updated.exercises.find((x) => !isDone(x)) ?? updated.exercises.find((x) => x.id === sessionExerciseId)!;
     set({ loaded: updated, currentExerciseId: next.id, draft: draftFor(next, unit) });
+    get().setMoment('Skipped. I will not count it against you.', 'neutral', 2500);
   },
 
   unskipExercise: async (sessionExerciseId) => {
@@ -308,7 +347,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     await updateSessionExercise(sessionExerciseId, { skipped: false, skipReason: null });
     const updated = replaceExercise(loaded, sessionExerciseId, (x) => ({ ...x, skipped: false, skipReason: null }));
     const e = updated.exercises.find((x) => x.id === sessionExerciseId)!;
-    set({ loaded: updated, currentExerciseId: sessionExerciseId, draft: draftFor(e, unit) });
+    set({ loaded: updated, currentExerciseId: sessionExerciseId, draft: draftFor(e, unit), moment: null });
   },
 
   setNotes: async (sessionExerciseId, notes) => {
@@ -326,22 +365,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   swap: async (sessionExerciseId, toExercise, reason, scope) => {
-    const { loaded, unit, userId, experience } = get();
+    const { loaded, unit, userId, experience, previous } = get();
     const e = loaded?.exercises.find((x) => x.id === sessionExerciseId);
     if (!loaded || !e) return;
     const row = await swapSessionExercise({ userId, session: loaded.session, sessionExercise: e, toExercise, reason, scope, unit, experience });
     const updated = replaceExercise(loaded, sessionExerciseId, (x) => ({ ...x, ...row, exercise: toExercise, sets: [] }));
     const e2 = updated.exercises.find((x) => x.id === sessionExerciseId)!;
-    set({ loaded: updated, currentExerciseId: sessionExerciseId, draft: draftFor(e2, unit) });
+    const history = previous[toExercise.id] ?? (await getExerciseHistory(userId, toExercise.id, 1, loaded.session.id))[0]?.sets ?? [];
+    set({ loaded: updated, previous: { ...previous, [toExercise.id]: history }, currentExerciseId: sessionExerciseId, draft: draftFor(e2, unit) });
+    get().setMoment(`${toExercise.name} instead. ${scope === 'program' ? 'I updated your program.' : 'Just for today.'}`, 'neutral', 3000);
   },
 
   addExercise: async (exercise) => {
-    const { loaded, unit, userId, experience } = get();
+    const { loaded, unit, userId, experience, previous } = get();
     if (!loaded) return;
     const row: SessionExerciseRow = await addSessionExercise(loaded.session.id, userId, exercise, loaded.exercises.length, unit, experience);
     const e: LoadedExercise = { ...row, exercise, sets: [] };
     const updated = { ...loaded, exercises: [...loaded.exercises, e] };
-    set({ loaded: updated, currentExerciseId: e.id, draft: draftFor(e, unit) });
+    const history = previous[exercise.id] ?? (await getExerciseHistory(userId, exercise.id, 1, loaded.session.id))[0]?.sets ?? [];
+    set({ loaded: updated, previous: { ...previous, [exercise.id]: history }, currentExerciseId: e.id, draft: draftFor(e, unit) });
   },
 
   startRest: async (seconds, exerciseName) => {
@@ -375,13 +417,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ rest: null });
   },
 
-  finish: async () => {
+  finish: async (early) => {
     const { loaded, unit, userId, experience, rest } = get();
     if (!loaded) return null;
     if (rest) await cancelRestEnd(rest.notificationId);
     const result = await finishSessionRepo({ userId, loaded, unit, experience });
-    set({ finished: result, rest: null, loaded: { ...loaded, session: { ...loaded.session, status: 'completed', summary: result.summary } } });
-    return result;
+    haptics.success();
+    set({ finished: { ...result, early }, rest: null, moment: null, loaded: { ...loaded, session: { ...loaded.session, status: 'completed', summary: result.summary } } });
+    return { ...result, early };
   },
 
   abandon: async () => {

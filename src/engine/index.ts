@@ -7,3 +7,4 @@ export * from './scheduling';
 export * from './bodyweight';
 export * from './strength';
 export * from './progression';
+export * from './voice';

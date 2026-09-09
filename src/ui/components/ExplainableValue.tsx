@@ -26,7 +26,7 @@ export function ExplainableValue({ label, value, delta, deltaTone = 'neutral', o
   return (
     <View style={[styles.row, { minHeight: compact ? theme.sizes.touchMin : theme.sizes.controlMd }]}>
       {label ? (
-        <Text variant={compact ? 'callout' : 'body'} style={styles.label} numberOfLines={1}>
+        <Text variant={compact ? 'callout' : 'body'} style={styles.label} numberOfLines={2}>
           {label}
         </Text>
       ) : null}

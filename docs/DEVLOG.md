@@ -4,6 +4,20 @@ Forma is a mobile strength-training app with one promise: tell it what you want 
 
 ---
 
+## 2026-09-08 · M3 polish: the personality layer
+
+After the first phone run the verdict was "clean but bland". The audit (docs/14) found the cause: the engine made every decision but the screens showed them as metadata, nothing acknowledged the user, and rest looked like lifting with a countdown. This pass adds a voice and a rhythm on top of the existing foundation, with no new features.
+
+- **Voice** (`src/engine/voice.ts`): every line is chosen by a state. Target sentences ("80 lb today. Up from 75."), graded set acknowledgements ("Good set." / "That was better than last time." / "Tough set. Logged. I will account for that."), "Rest's up.", record lines, finish verdicts, and the Home sentence. Deterministic rotation; no exclamation marks, no emoji.
+- **Rhythm**: the header shows the phase (Lifting · Resting); the dock shifts into recovery mode with a large countdown, muted fields, a next-set preview, ticks in the last three seconds, and a highlight on Complete set when rest ends; a completed set lands with a brief success tint; haptics are graded by outcome; a record shows inline in the dock with a "Best" pill on the row.
+- **Why sheet**: opens on the decision, promotes "What changes my mind", and the deeper tiers read as "What I saw" and "How I decide". All 33 rule descriptions rewritten in Forma's voice.
+- **Summary**: a verdict sentence from the session data, records first, next-time rows as decisions, "Done for today."
+- **Exercise blocks**: target in words, first-time guidance, Add set plus a menu, "Next" marker, borderless surfaces.
+- **Home**: "Upper A is ready" and one sentence about today from the engine's targets.
+- **Tokens**: accent moved from app blue to mineral teal, used only for active states; numbers in the dock at weight 600.
+
+130 tests. Verified in the browser through onboarding, a logged set, recovery, return, the Why sheet, and an early finish.
+
 ## 2026-09-07 · M3: the workout screen
 
 ### Where things stand
