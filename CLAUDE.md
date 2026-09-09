@@ -16,7 +16,7 @@ Mobile-first strength-training app. Expo SDK 57, Expo Router, TypeScript strict,
 - `npm run typecheck` · `npm run lint` · `npm test`
 - `npm run db:generate` after changing `src/data/schema` (migrations are additive only)
 - `npm run web` then open `/dev/gallery` to preview components
-- Native: `npx expo run:android` / `npx expo run:ios` (dev build; Expo Go is not sufficient for SQLite migrations + notifications)
+- Native: `npx expo start` works in Expo Go (everything except background rest alerts). `eas build --profile development` for a dev build with notifications. Never import `expo-notifications` at module top level: it throws inside Expo Go on Android (see `src/services/notifications.ts`).
 
 ## Layout
 `src/app` routes → `src/features` screens → `src/ui` design system · `src/engine` rules · `src/data` Drizzle schema/repos/seed · `src/domain` types · `src/exercises` seed content · `src/store` Zustand.
