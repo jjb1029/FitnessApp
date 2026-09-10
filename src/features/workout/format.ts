@@ -20,6 +20,26 @@ export function formatSetLoad(exercise: Exercise, loadKg: number | null, addedLo
   return `${trimNumber(displayLoad(loadKg, unit, exercise.incrementKg))} ${unit}`;
 }
 
+/**
+ * The same load, split so the number and its unit can be set separately
+ * (docs/16 V2). `text` is for loads that are not a measurement — "BW",
+ * "unassisted", or nothing logged.
+ */
+export type LoadParts = { value: string; unit: string | null } | { text: string };
+
+export function setLoadParts(exercise: Exercise, loadKg: number | null, addedLoadKg: number | null, unit: WeightUnit): LoadParts {
+  if (isBodyweightExercise(exercise)) {
+    const added = addedLoadKg ?? 0;
+    return added > 0 ? { value: `BW +${trimNumber(displayLoad(added, unit, exercise.incrementKg))}`, unit } : { text: 'BW' };
+  }
+  if (exercise.loadType === 'assisted') {
+    const assist = Math.abs(addedLoadKg ?? loadKg ?? 0);
+    return assist > 0 ? { value: `−${trimNumber(displayLoad(assist, unit, exercise.incrementKg))}`, unit: `${unit} assist` } : { text: 'unassisted' };
+  }
+  if (loadKg === null) return { text: '—' };
+  return { value: trimNumber(displayLoad(loadKg, unit, exercise.incrementKg)), unit };
+}
+
 export function formatSetRow(exercise: Exercise, set: PerformedSetRow, unit: WeightUnit, scale: IntensityScale): string {
   const load = formatSetLoad(exercise, set.loadKg, set.addedLoadKg, unit);
   const effort = set.rir === null ? '' : ` · ${formatEffort(set.rir, scale)}`;

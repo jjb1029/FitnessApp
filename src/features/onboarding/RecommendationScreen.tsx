@@ -129,7 +129,7 @@ function DayCard({ day, expanded, onToggle }: { day: ResolvedDay; expanded: bool
                   </Text>
                 ) : null}
               </View>
-              <Text variant="mono" color="textSecondary">
+              <Text variant="numBody" color="textSecondary">
                 {e.sets} × {e.repRange.min}–{e.repRange.max}
               </Text>
             </View>

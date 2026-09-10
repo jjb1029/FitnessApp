@@ -25,13 +25,13 @@ export function OptionRow({ label, subtitle, icon, selected = false, onPress }: 
           minHeight: 68,
           borderRadius: theme.radius.lg,
           paddingHorizontal: theme.spacing.lg,
-          backgroundColor: selected ? theme.colors.accentSubtle : pressed ? theme.colors.bgSunken : theme.colors.bgElevated,
-          borderColor: selected ? theme.colors.accent : theme.colors.border,
+          backgroundColor: selected ? theme.colors.bgSunken : pressed ? theme.colors.bgSunken : theme.colors.bgElevated,
+          borderColor: selected ? theme.colors.text : theme.colors.border,
         },
       ]}>
       {icon ? (
-        <View style={[styles.iconWrap, { backgroundColor: selected ? theme.colors.accent : theme.colors.bgSunken, borderRadius: theme.radius.md }]}>
-          <Icon name={icon} size={20} rawColor={selected ? theme.colors.textOnAccent : theme.colors.textSecondary} />
+        <View style={[styles.iconWrap, { backgroundColor: selected ? theme.colors.ink : theme.colors.bgSunken, borderRadius: theme.radius.md }]}>
+          <Icon name={icon} size={20} rawColor={selected ? theme.colors.inkText : theme.colors.textSecondary} />
         </View>
       ) : null}
       <View style={styles.text}>
@@ -42,7 +42,7 @@ export function OptionRow({ label, subtitle, icon, selected = false, onPress }: 
           </Text>
         ) : null}
       </View>
-      {selected ? <Icon name="checkmark-circle" color="accent" /> : null}
+      {selected ? <Icon name="checkmark-circle" color="text" /> : null}
     </Pressable>
   );
 }

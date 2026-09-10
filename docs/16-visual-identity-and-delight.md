@@ -1,6 +1,13 @@
 # 16 · Visual Identity and Delight
 
-Status: **proposal for approval.** No code changes made. This document sits beside docs/14 (how Forma speaks) and docs/15 (what Forma is and how screens are arranged). It answers a third question: **what Forma looks like.**
+Status: **approved 2026-09-10. Tier 1 implemented; Tiers 2–4 not started.**
+
+Approval amendments:
+- **The ink primary button is an experiment, not a law.** It ships behind `primaryActionFill` in `src/ui/tokens.ts`; flipping that one value restores the teal button everywhere. Judge it on device before it is locked in.
+- **"Space over borders" is not "cards are forbidden."** A container has to communicate meaning: keep it where it stands for a genuinely discrete object or collection, remove it where it only wraps content that space and hierarchy could group. Under that rule the Today block, the summary's next-time list and the finish verdict lost their cards; Home's bodyweight/week list, the deferred strip and the settings groups kept theirs.
+- **Teal marks what Forma computed; green marks what the user did.** An estimated 1RM is Forma's inference, so a record's estimated max is teal; a logged +5 lb or +1 rep is the user's own fact, so it is green. This resolves the tension between §5's colour law and §9's M4.
+
+This document sits beside docs/14 (how Forma speaks) and docs/15 (what Forma is and how screens are arranged). It answers a third question: **what Forma looks like.**
 
 Audited against the working tree at commit `b099173`, by reading the components rather than the specs. Where the documents and the code disagree, the code is quoted.
 

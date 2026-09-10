@@ -101,7 +101,7 @@ function DayRow({ day, isNext, expanded, onToggle }: { day: ActiveProgram['days'
                   {e.notes ?? `${e.targetRir} RIR · rest ${Math.round(e.restSeconds / 60 * 10) / 10} min`}
                 </Text>
               </View>
-              <Text variant="mono" color="textSecondary">
+              <Text variant="numBody" color="textSecondary">
                 {e.workingSets} × {e.repRange.min}–{e.repRange.max}
               </Text>
             </View>

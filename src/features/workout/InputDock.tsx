@@ -8,7 +8,7 @@ import type { IntensityScale, WeightUnit } from '@/domain';
 import { formatDuration } from '@/lib/dates';
 import { incrementStepInUnit, trimNumber } from '@/lib/units';
 import type { Draft, RestState } from '@/store/sessionStore';
-import { Button, ProgressBar, Stepper, Text, useTheme, type ColorName } from '@/ui';
+import { Button, DecisionBlock, Measure, ProgressBar, Stepper, Text, useTheme, type ColorName } from '@/ui';
 
 import { effortLabel, effortValue, isBodyweightExercise } from './format';
 
@@ -46,13 +46,15 @@ export type InputDockProps = {
 };
 
 /**
- * The current action (docs/15 §3). This surface answers "what am I doing
- * right now": the exercise, the numbers, and one button. It owns the
- * exercise's identity so the answer is a single unit, and the numbers are
- * the largest thing on the screen because they are what the user acts on.
+ * The current action, as a Decision Block (docs/15 §3, docs/16 §6). The
+ * exercise is the eyebrow, Forma's line is the basis, the numbers are the
+ * lead, and there is one button. It owns the exercise's identity so the answer
+ * to "what am I doing right now" is a single unit, and the numbers are the
+ * largest thing on the screen because they are what the user acts on.
  *
- * While resting the same surface becomes recovery: the countdown leads, the
- * fields dim but stay usable, and the next set waits underneath.
+ * While resting the same block becomes recovery: the countdown is the lead,
+ * the next set is the basis, Skip is the door, and the fields dim but stay
+ * usable underneath.
  */
 export function InputDock(p: InputDockProps) {
   const theme = useTheme();
@@ -68,6 +70,75 @@ export function InputDock(p: InputDockProps) {
 
   const lineColor: ColorName = line.tone === 'success' ? 'success' : line.tone === 'accent' ? 'accent' : line.emphasis === 'quiet' ? 'textSecondary' : 'text';
   const nextPreview = draft && exercise ? nextSetPreview(draft, exercise, unit, bodyweight) : null;
+  const momentSpeaking = line.emphasis === 'moment';
+
+  const fields =
+    exercise && draft ? (
+      <View style={[styles.fields, { gap: theme.spacing.sm }]}>
+        <Stepper
+          value={draft.load ?? 0}
+          onChange={(v) => p.onChange({ load: v })}
+          onBump={p.onBump}
+          step={step}
+          min={0}
+          size="action"
+          unit={bodyweight ? `+${unit}` : unit}
+          formatValue={(v) => (draft.load === null ? '—' : trimNumber(v))}
+          onPressValue={() => p.onOpenKeypad('load')}
+          accessibilityLabel={bodyweight ? 'Added weight' : 'Weight'}
+          muted={resting}
+          style={{ flex: 46 }}
+        />
+        <Stepper
+          value={draft.reps}
+          onChange={(v) => p.onChange({ reps: v })}
+          onBump={p.onBump}
+          step={1}
+          min={0}
+          max={100}
+          size="action"
+          unit={exercise.exercise.laterality === 'unilateral' ? 'reps / side' : 'reps'}
+          onPressValue={() => p.onOpenKeypad('reps')}
+          accessibilityLabel="Reps"
+          muted={resting}
+          style={{ flex: 32 }}
+        />
+        <Pressable
+          onPress={p.onOpenRir}
+          accessibilityRole="button"
+          accessibilityLabel={`${effortLabel(scale)} ${draft.rir === null ? 'not set' : effortValue(draft.rir, scale)}`}
+          style={({ pressed }) => [styles.rir, { flex: 22, height: 72, borderRadius: theme.radius.md, backgroundColor: pressed ? theme.colors.border : theme.colors.bgSunken, borderColor: theme.colors.border, opacity: resting ? 0.6 : 1 }]}>
+          <Measure value={draft.rir === null ? '–' : effortValue(draft.rir, scale)} size="numBody" tone="textSecondary" accessible={false} />
+          <Text variant="caption" color="textTertiary">
+            {effortLabel(scale)} ▾
+          </Text>
+        </Pressable>
+      </View>
+    ) : null;
+
+  const action =
+    exercise && draft ? (
+      p.allDone && !editing ? (
+        <View style={[styles.finishRow, { gap: theme.spacing.sm }]}>
+          <Button label="Finish workout" size="lg" icon="checkmark-done" onPress={p.onFinish} style={{ flex: 1 }} />
+          <Button label="Add set" size="lg" variant="secondary" onPress={p.onComplete} />
+        </View>
+      ) : (
+        <ReturnHighlight returnKey={p.returnKey} reduceMotion={theme.reduceMotion} tint={theme.colors.accentSubtle} radius={theme.radius.md}>
+          <Button
+            label={editing ? 'Save set' : 'Complete set'}
+            size="lg"
+            fullWidth
+            icon="checkmark"
+            variant={resting && !p.restEnded ? 'secondary' : 'primary'}
+            onPress={p.onComplete}
+            disabled={needsWeight}
+          />
+        </ReturnHighlight>
+      )
+    ) : (
+      <Button label="Finish workout" size="lg" fullWidth icon="checkmark-done" onPress={p.onFinish} />
+    );
 
   return (
     <View
@@ -81,140 +152,74 @@ export function InputDock(p: InputDockProps) {
         },
       ]}>
       {resting ? (
-        <View style={styles.recovery} accessibilityLiveRegion="polite">
-          <View style={styles.recoveryTop}>
-            <Text variant="callout" color={p.restEnded || line.emphasis === 'moment' ? lineColor : 'textSecondary'} style={{ flex: 1, fontWeight: p.restEnded || line.emphasis === 'moment' ? '600' : '400' }} numberOfLines={1}>
-              {line.emphasis === 'moment' ? line.text : 'Rest'}
-            </Text>
-            <Pressable onPress={p.onSkipRest} accessibilityRole="button" accessibilityLabel="Skip rest" hitSlop={8} style={styles.skip}>
-              <Text variant="callout" color="textSecondary" style={{ fontWeight: '600' }}>
-                Skip
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.countdownRow}>
-            <Text variant="monoDisplay" color={p.restEnded || lastSeconds ? 'accent' : 'text'} accessibilityLabel={`${remaining} seconds remaining`}>
-              {p.restEnded ? '0:00' : formatDuration(remaining)}
-            </Text>
-            <View style={styles.adjust}>
-              <Pressable onPress={() => p.onAdjustRest(-15)} accessibilityRole="button" accessibilityLabel="Fifteen seconds less rest" style={[styles.adjustBtn, { backgroundColor: theme.colors.bgSunken, borderRadius: theme.radius.md }]}>
-                <Text variant="callout" style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>
-                  −15
-                </Text>
-              </Pressable>
-              <Pressable onPress={() => p.onAdjustRest(15)} accessibilityRole="button" accessibilityLabel="Fifteen seconds more rest" style={[styles.adjustBtn, { backgroundColor: theme.colors.bgSunken, borderRadius: theme.radius.md }]}>
-                <Text variant="callout" style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>
-                  +15
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-          <ProgressBar progress={rest.totalSeconds > 0 ? 1 - remaining / rest.totalSeconds : 1} color={p.restEnded ? 'success' : 'accent'} height={3} />
-          {nextPreview ? (
-            <Text variant="caption" color="textTertiary" numberOfLines={1}>
-              Next: {nextPreview}
-            </Text>
-          ) : null}
+        <View accessibilityLiveRegion="polite">
+          <DecisionBlock
+            rank="section"
+            eyebrow={{ text: 'Resting', tone: 'accent' }}
+            door={{ label: 'Skip', onPress: p.onSkipRest, accessibilityLabel: 'Skip rest' }}
+            lead={
+              <View style={styles.countdownRow}>
+                <Measure
+                  value={p.restEnded ? '0:00' : formatDuration(remaining)}
+                  size="numDisplay"
+                  tone={p.restEnded || lastSeconds ? 'accent' : 'text'}
+                  accessibilityLabel={`${remaining} seconds remaining`}
+                />
+                <View style={styles.adjust}>
+                  <Pressable onPress={() => p.onAdjustRest(-15)} accessibilityRole="button" accessibilityLabel="Fifteen seconds less rest" style={[styles.adjustBtn, { backgroundColor: theme.colors.bgSunken, borderRadius: theme.radius.md }]}>
+                    <Text variant="numCaption">−15</Text>
+                  </Pressable>
+                  <Pressable onPress={() => p.onAdjustRest(15)} accessibilityRole="button" accessibilityLabel="Fifteen seconds more rest" style={[styles.adjustBtn, { backgroundColor: theme.colors.bgSunken, borderRadius: theme.radius.md }]}>
+                    <Text variant="numCaption">+15</Text>
+                  </Pressable>
+                </View>
+              </View>
+            }
+            basis={
+              <View style={{ gap: 6 }}>
+                <ProgressBar progress={rest.totalSeconds > 0 ? 1 - remaining / rest.totalSeconds : 1} color={p.restEnded ? 'success' : 'accent'} height={3} />
+                {/* One slot: Forma while it has something to say, the next set otherwise. */}
+                {momentSpeaking ? (
+                  <Text variant="callout" color={lineColor} numberOfLines={2} style={{ fontWeight: '600' }}>
+                    {line.text}
+                  </Text>
+                ) : nextPreview ? (
+                  <Text variant="caption" color="textTertiary" numberOfLines={1}>
+                    Next: {nextPreview}
+                  </Text>
+                ) : null}
+              </View>
+            }
+          />
         </View>
       ) : (
-        <View style={styles.action}>
-          <View style={styles.identityRow}>
-            <Text variant="headline" numberOfLines={1} style={{ flex: 1 }}>
-              {exercise?.exercise.name ?? ''}
+        <DecisionBlock
+          rank="section"
+          eyebrow={exercise ? { text: exercise.exercise.name, variant: 'title' } : undefined}
+          door={
+            exercise && !editing
+              ? { label: 'Why?', onPress: p.onWhy, accessibilityLabel: 'Why this target' }
+              : editing
+                ? { label: 'Cancel', onPress: p.onCancelEdit }
+                : undefined
+          }
+          // Forma's line sits with the identity, above the numbers, so the
+          // fields and the button stay adjacent under the thumb.
+          basisPlacement="above"
+          basis={
+            <Text
+              variant={momentSpeaking ? 'title2' : line.emphasis === 'quiet' ? 'caption' : 'callout'}
+              color={lineColor}
+              numberOfLines={momentSpeaking ? 3 : 1}
+              accessibilityLiveRegion={momentSpeaking ? 'polite' : 'none'}>
+              {line.text}
             </Text>
-            {exercise && !editing ? (
-              <Pressable onPress={p.onWhy} accessibilityRole="button" accessibilityLabel="Why this target" hitSlop={8} style={styles.door}>
-                <Text variant="callout" color="accent" style={{ fontWeight: '600' }}>
-                  Why?
-                </Text>
-              </Pressable>
-            ) : null}
-            {editing ? (
-              <Pressable onPress={p.onCancelEdit} accessibilityRole="button" hitSlop={8} style={styles.door}>
-                <Text variant="callout" color="accent" style={{ fontWeight: '600' }}>
-                  Cancel
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <Text
-            variant={line.emphasis === 'quiet' ? 'caption' : 'callout'}
-            color={lineColor}
-            numberOfLines={1}
-            style={{ fontWeight: line.emphasis === 'moment' ? '600' : '400' }}
-            accessibilityLiveRegion={line.emphasis === 'moment' ? 'polite' : 'none'}>
-            {line.text}
-          </Text>
-        </View>
+          }
+          lead={fields ?? <View />}
+        />
       )}
-
-      {exercise && draft ? (
-        <>
-          <View style={[styles.fields, { gap: theme.spacing.sm }]}>
-            <Stepper
-              value={draft.load ?? 0}
-              onChange={(v) => p.onChange({ load: v })}
-              onBump={p.onBump}
-              step={step}
-              min={0}
-              size='action'
-              unit={bodyweight ? `+${unit}` : unit}
-              formatValue={(v) => (draft.load === null ? '—' : trimNumber(v))}
-              onPressValue={() => p.onOpenKeypad('load')}
-              accessibilityLabel={bodyweight ? 'Added weight' : 'Weight'}
-              muted={resting}
-              style={{ flex: 46 }}
-            />
-            <Stepper
-              value={draft.reps}
-              onChange={(v) => p.onChange({ reps: v })}
-              onBump={p.onBump}
-              step={1}
-              min={0}
-              max={100}
-              size='action'
-              unit={exercise.exercise.laterality === 'unilateral' ? 'reps / side' : 'reps'}
-              onPressValue={() => p.onOpenKeypad('reps')}
-              accessibilityLabel="Reps"
-              muted={resting}
-              style={{ flex: 32 }}
-            />
-            <Pressable
-              onPress={p.onOpenRir}
-              accessibilityRole="button"
-              accessibilityLabel={`${effortLabel(scale)} ${draft.rir === null ? 'not set' : effortValue(draft.rir, scale)}`}
-              style={({ pressed }) => [styles.rir, { flex: 22, height: 72, borderRadius: theme.radius.md, backgroundColor: pressed ? theme.colors.border : theme.colors.bgSunken, borderColor: theme.colors.border, opacity: resting ? 0.6 : 1 }]}>
-              <Text variant="mono" color="textSecondary">
-                {draft.rir === null ? '–' : effortValue(draft.rir, scale)}
-              </Text>
-              <Text variant="caption" color="textTertiary">
-                {effortLabel(scale)} ▾
-              </Text>
-            </Pressable>
-          </View>
-          {p.allDone && !editing ? (
-            <View style={[styles.finishRow, { gap: theme.spacing.sm }]}>
-              <Button label="Finish workout" size="lg" icon="checkmark-done" onPress={p.onFinish} style={{ flex: 1 }} />
-              <Button label="Add set" size="lg" variant="secondary" onPress={p.onComplete} />
-            </View>
-          ) : (
-            <ReturnHighlight returnKey={p.returnKey} reduceMotion={theme.reduceMotion} tint={theme.colors.accentSubtle} radius={theme.radius.md}>
-              <Button
-                label={editing ? 'Save set' : 'Complete set'}
-                size="lg"
-                fullWidth
-                icon="checkmark"
-                variant={resting && !p.restEnded ? 'secondary' : 'primary'}
-                onPress={p.onComplete}
-                disabled={needsWeight}
-                style={{ marginTop: theme.spacing.sm }}
-              />
-            </ReturnHighlight>
-          )}
-        </>
-      ) : (
-        <Button label="Finish workout" size="lg" fullWidth icon="checkmark-done" onPress={p.onFinish} style={{ marginTop: theme.spacing.sm }} />
-      )}
+      {resting && fields ? <View style={{ marginTop: theme.spacing.sm }}>{fields}</View> : null}
+      <View style={{ marginTop: theme.spacing.sm }}>{action}</View>
     </View>
   );
 }
@@ -236,7 +241,7 @@ function ReturnHighlight({ returnKey, reduceMotion, tint, radius, children }: { 
   const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
   return (
     <View>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { top: 8, backgroundColor: tint, borderRadius: radius, transform: [{ scale: 1.03 }] }, style]} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: radius, transform: [{ scale: 1.03 }] }, style]} />
       {children}
     </View>
   );
@@ -244,16 +249,10 @@ function ReturnHighlight({ returnKey, reduceMotion, tint, radius, children }: { 
 
 const styles = StyleSheet.create({
   dock: { paddingTop: 10, boxShadow: '0 -6px 18px rgba(0, 0, 0, 0.18)' },
-  action: { gap: 2, paddingBottom: 2 },
-  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
-  door: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 4 },
-  recovery: { gap: 6, paddingBottom: 4 },
-  recoveryTop: { flexDirection: 'row', alignItems: 'center', minHeight: 28, gap: 8 },
-  skip: { minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center' },
   countdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   adjust: { flexDirection: 'row', gap: 8 },
   adjustBtn: { minHeight: 44, minWidth: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  fields: { flexDirection: 'row', alignItems: 'stretch', marginTop: 6 },
+  fields: { flexDirection: 'row', alignItems: 'stretch' },
   rir: { alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
-  finishRow: { flexDirection: 'row', marginTop: 8 },
+  finishRow: { flexDirection: 'row' },
 });

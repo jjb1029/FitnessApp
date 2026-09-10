@@ -90,7 +90,8 @@ export function HomeScreen() {
   };
 
   const trend = data?.trend;
-  const weightValue = trend?.avg7Kg != null ? formatWeight(trend.avg7Kg, unit) : undefined;
+  // The unit is passed separately so it can be set a step down (docs/16 V2).
+  const weightValue = trend?.avg7Kg != null ? kgToUnit(trend.avg7Kg, unit).toFixed(1) : undefined;
   const weightSubtitle =
     trend && trend.entryCount > 0
       ? trend.ratePerWeekKg != null
@@ -112,12 +113,12 @@ export function HomeScreen() {
 
       <View style={{ marginTop: theme.spacing.xl }}>
         {loading && !data ? (
-          <Card>
+          <View style={{ gap: theme.spacing.sm }}>
             <Skeleton height={14} width="30%" />
             <Skeleton height={34} width="60%" />
             <Skeleton height={18} width="50%" />
             <Skeleton height={56} radius={12} />
-          </Card>
+          </View>
         ) : (
           <TodayCard
             active={active}
@@ -134,11 +135,12 @@ export function HomeScreen() {
         )}
       </View>
 
-      <Card padded={false} style={{ marginTop: theme.spacing.lg, paddingHorizontal: theme.spacing.lg }}>
+      <Card padded={false} style={{ marginTop: theme.spacing.xxxl, paddingHorizontal: theme.spacing.lg }}>
         <ListRow
           title="Bodyweight"
           subtitle={weightSubtitle}
           value={weightValue}
+          valueUnit={weightValue ? unit : undefined}
           icon="scale-outline"
           chevron={false}
           trailing={<IconButton icon="add" accessibilityLabel="Log bodyweight" onPress={() => setWeightSheet(true)} filled />}

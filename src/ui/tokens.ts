@@ -11,10 +11,17 @@ export const lightColors = {
   textSecondary: '#5C6370',
   textTertiary: '#8B919C',
   textOnAccent: '#FFFFFF',
-  // Mineral teal (docs/14 §5): identifies active states and Forma's decisions; neutrals carry the rest.
+  /**
+   * Mineral teal. Under the colour law (docs/16 §5) teal means *Forma is
+   * speaking, deciding, or reasoning* — never "this is tappable".
+   */
   accent: '#0F9D8A',
   accentPressed: '#0C8474',
   accentSubtle: '#E3F5F1',
+  /** Ink: the user's own action. Primary buttons, selection, anything they drive. */
+  ink: '#111318',
+  inkPressed: '#2A2E36',
+  inkText: '#FFFFFF',
   success: '#1F9D55',
   successSubtle: '#E6F5EC',
   warning: '#C98A00',
@@ -37,6 +44,9 @@ export const darkColors: Colors = {
   accent: '#2CC4AE',
   accentPressed: '#25AB98',
   accentSubtle: '#12302C',
+  ink: '#F2F3F5',
+  inkPressed: '#D5D8DD',
+  inkText: '#0B0C0E',
   success: '#3DBB74',
   successSubtle: '#12271B',
   warning: '#E5A800',
@@ -95,14 +105,33 @@ export const typography = {
   callout: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   label: { fontSize: 13, lineHeight: 18, fontWeight: '600', letterSpacing: 0.4 },
-  mono: { fontSize: 17, lineHeight: 22, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  monoLarge: { fontSize: 28, lineHeight: 34, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  /** The number the user is about to act on: the loudest thing on the workout screen. */
-  monoAction: { fontSize: 32, lineHeight: 38, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
+  // ---- The numeric ramp (docs/16 §4c). Numbers are a different material from
+  // words: always tabular, always one weight above the prose beside them.
+  // Anything the engine measured or decided is set in these, never in `body`.
+  /** Deltas, set indexes, stat captions. */
+  numCaption: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  /** Set rows, Why factors, next-time targets, list values. */
+  numBody: { fontSize: 17, lineHeight: 22, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.2 },
+  /** The evidence for a verdict: summary highlights, a record's estimated max. */
+  numTitle: { fontSize: 22, lineHeight: 28, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
+  /** The number the user is about to act on: the loudest thing while lifting. */
+  numAction: { fontSize: 32, lineHeight: 38, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
   /** The rest countdown, which owns the screen while it runs. */
-  monoDisplay: { fontSize: 44, lineHeight: 50, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
+  numDisplay: { fontSize: 44, lineHeight: 50, fontWeight: '600', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
 } as const satisfies Record<string, TextStyle>;
 export type TypographyName = keyof typeof typography;
+
+/** The five steps of the numeric ramp, smallest first. */
+export type NumericSize = 'numCaption' | 'numBody' | 'numTitle' | 'numAction' | 'numDisplay';
+
+/**
+ * Which fill the primary action uses (docs/16 §5, V3).
+ *
+ * `ink` is the approved experiment: teal is reserved for Forma's voice, so the
+ * user's own action is a high-contrast neutral. Flip this one value to
+ * `'accent'` to put the teal button back — nothing else needs to change.
+ */
+export const primaryActionFill: 'ink' | 'accent' = 'ink';
 
 export const monospace = monoFamily;
 

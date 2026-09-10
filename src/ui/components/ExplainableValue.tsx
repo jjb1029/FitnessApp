@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '../theme';
+import { Measure } from './Measure';
 import { Text } from './Text';
 
 export type ExplainableValueProps = {
@@ -30,9 +31,9 @@ export function ExplainableValue({ label, value, delta, deltaTone = 'neutral', o
           {label}
         </Text>
       ) : null}
-      <Text variant="mono">{value}</Text>
+      <Measure value={value} size="numBody" />
       {delta ? (
-        <Text variant="callout" color={deltaColor}>
+        <Text variant="numCaption" color={deltaColor}>
           {delta}
         </Text>
       ) : null}

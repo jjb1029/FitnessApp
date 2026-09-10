@@ -5,6 +5,7 @@ import type { Explanation } from '@/domain';
 
 import { useTheme } from '../theme';
 import { Button } from './Button';
+import { Measure } from './Measure';
 import { Sheet } from './Sheet';
 import { StatusPill } from './StatusPill';
 import { Text } from './Text';
@@ -55,10 +56,7 @@ export function WhySheet({ visible, onClose, title, explanation, knowledgeItems 
                     <Text variant="caption" color="textSecondary" style={styles.factorLabel}>
                       {f.label}
                     </Text>
-                    <Text variant="mono">
-                      {f.value}
-                      {f.unit ? ` ${f.unit}` : ''}
-                    </Text>
+                    <Measure value={f.value} unit={f.unit ?? null} size="numBody" accessible={false} />
                   </View>
                 ))}
               </View>
@@ -82,8 +80,8 @@ export function WhySheet({ visible, onClose, title, explanation, knowledgeItems 
 
           <View style={[styles.actions, { gap: theme.spacing.sm }]}>
             <Button label="Got it" size="lg" fullWidth onPress={close} />
-            {tier === 1 ? <Button label="Show more" variant="ghost" onPress={() => setTier(2)} /> : null}
-            {tier === 2 ? <Button label="Where this comes from" variant="ghost" onPress={() => setTier(3)} /> : null}
+            {tier === 1 ? <Button label="Show more" variant="door" onPress={() => setTier(2)} /> : null}
+            {tier === 2 ? <Button label="Where this comes from" variant="door" onPress={() => setTier(3)} /> : null}
           </View>
         </ScrollView>
       ) : (

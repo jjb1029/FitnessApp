@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 
 import { useTheme } from '../theme';
 import { Icon, type IconName } from './Icon';
+import { Measure } from './Measure';
 import { Text } from './Text';
 
 export type ListRowProps = {
@@ -10,8 +11,10 @@ export type ListRowProps = {
   subtitle?: string;
   leading?: ReactNode;
   trailing?: ReactNode;
-  /** Right-aligned value text, e.g. "182.4 lb". */
+  /** Right-aligned measured value, e.g. "182.4". */
   value?: string;
+  /** Unit for `value`, rendered a step down and tertiary. */
+  valueUnit?: string;
   chevron?: boolean;
   icon?: IconName;
   onPress?: () => void;
@@ -26,6 +29,7 @@ export function ListRow({
   leading,
   trailing,
   value,
+  valueUnit,
   chevron,
   icon,
   onPress,
@@ -48,11 +52,7 @@ export function ListRow({
           </Text>
         ) : null}
       </View>
-      {value ? (
-        <Text variant="mono" color="textSecondary">
-          {value}
-        </Text>
-      ) : null}
+      {value ? <Measure value={value} unit={valueUnit ?? null} size="numBody" tone="text" /> : null}
       {trailing}
       {showChevron ? <Icon name="chevron-forward" size={theme.sizes.iconSm} color="textTertiary" /> : null}
     </>

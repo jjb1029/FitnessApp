@@ -1,10 +1,12 @@
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '../theme';
+import { primaryActionFill } from '../tokens';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+/** `door` is Forma's "Why?" affordance and carries the teal; `ghost` is secondary navigation and does not. */
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'door' | 'destructive';
 export type ButtonSize = 'md' | 'lg';
 
 export type ButtonProps = {
@@ -39,10 +41,19 @@ export function Button({
   const height = size === 'lg' ? theme.sizes.controlLg : theme.sizes.controlMd;
   const isDisabled = disabled || loading;
 
+  // The primary action is the user's, not Forma's, so it carries ink rather
+  // than teal (docs/16 V3). `primaryActionFill` flips the whole app back.
+  const primary =
+    primaryActionFill === 'ink'
+      ? { bg: colors.ink, bgPressed: colors.inkPressed, fg: colors.inkText, border: 'transparent' }
+      : { bg: colors.accent, bgPressed: colors.accentPressed, fg: colors.textOnAccent, border: 'transparent' };
+
   const palette = {
-    primary: { bg: colors.accent, bgPressed: colors.accentPressed, fg: colors.textOnAccent, border: 'transparent' },
+    primary,
     secondary: { bg: colors.bgElevated, bgPressed: colors.bgSunken, fg: colors.text, border: colors.border },
-    ghost: { bg: 'transparent', bgPressed: colors.bgSunken, fg: colors.accent, border: 'transparent' },
+    // Ghost buttons are secondary navigation ("Do later", "Skip"), not doors.
+    ghost: { bg: 'transparent', bgPressed: colors.bgSunken, fg: colors.textSecondary, border: 'transparent' },
+    door: { bg: 'transparent', bgPressed: colors.bgSunken, fg: colors.accent, border: 'transparent' },
     destructive: { bg: colors.dangerSubtle, bgPressed: colors.dangerSubtle, fg: colors.danger, border: 'transparent' },
   }[variant];
 
@@ -54,7 +65,7 @@ export function Button({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       testID={testID}
-      hitSlop={variant === 'ghost' ? 6 : undefined}
+      hitSlop={variant === 'ghost' || variant === 'door' ? 6 : undefined}
       style={({ pressed }) => [
         styles.base,
         {
@@ -66,8 +77,8 @@ export function Button({
           borderWidth: variant === 'secondary' ? StyleSheet.hairlineWidth : 0,
           opacity: isDisabled ? 0.5 : 1,
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
-          paddingHorizontal: variant === 'ghost' ? theme.spacing.sm : theme.spacing.xl,
-          transform: [{ scale: pressed && !theme.reduceMotion && variant !== 'ghost' ? 0.97 : 1 }],
+          paddingHorizontal: variant === 'ghost' || variant === 'door' ? theme.spacing.sm : theme.spacing.xl,
+          transform: [{ scale: pressed && !theme.reduceMotion && variant !== 'ghost' && variant !== 'door' ? 0.97 : 1 }],
         },
         style,
       ]}>

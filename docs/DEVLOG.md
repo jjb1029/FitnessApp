@@ -4,6 +4,18 @@ Forma is a mobile strength-training app with one promise: tell it what you want 
 
 ---
 
+## 2026-09-10 · Visual identity, Tier 1: numbers, the Decision Block, and what teal means
+
+Three changes that give Forma a look rather than a theme (docs/16, Tier 1 of four). No new features, no engine change, no data-model change.
+
+- **Numbers are a different material from words.** A five-step numeric ramp (13 / 17 / 22 / 32 / 44, tabular, one weight above the prose beside it) replaces the four ad-hoc `mono` sizes, and a `Measure` primitive sets every value with its unit a step down in tertiary. Set rows, the dock, the countdown, Why-sheet factors, summary evidence, next-time targets and bodyweight all go through it, so a column of sets now reads as a column of numbers.
+- **The Decision Block is a component.** `DecisionBlock` fixes the grammar Forma had only in prose: eyebrow and door share the top row, the basis sits against the lead, the lead's size comes from the block's rank, and there is no border. Today, the current action, rest, the finish verdict and every next-time row are now the same shape at three scales.
+- **Teal means Forma.** It is no longer the colour of anything tappable. The user's own action carries ink — a high-contrast neutral fill — and teal is left to mark Forma speaking, deciding, or offering its reasoning: the door, the resting phase, the countdown, an estimated max, "I've set next session." Buttons gained a `door` variant so the law is enforced in the type system. The ink fill sits behind `primaryActionFill` so one value flips the whole app back to teal.
+
+Also fixed while looking at it: the reps stepper's unit column was ~17 pt wide once both 44 pt buttons were placed, so "reps" truncated to "r…" — the unit now spans the field and the three units share a baseline. Current and pending set rows were still built from a joined string while done rows were not; they now use the same treatment.
+
+147 tests. Verified in the browser across five sessions in both themes, including rest, a record, and the Today sentence changing from "your first session" to "same weights as last time" as the data changed.
+
 ## 2026-09-08 · M3 character: what the screen is arranged around
 
 The personality layer gave Forma a voice but not a shape. The workout screen was still arranged the way every tracker is arranged: a list of the workout with a data-entry surface attached, with good copy on top. This pass reorganises the screens around the decision Forma made rather than the record the user is keeping (docs/15).

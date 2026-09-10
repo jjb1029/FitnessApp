@@ -149,7 +149,7 @@ export function SwapSheet({ visible, item, candidates, availableEquipment, onSwa
                     <Text variant="headline" style={{ flex: 1 }}>
                       {r.exercise.name}
                     </Text>
-                    <Text variant="mono" color="accent">
+                    <Text variant="numBody" color="accent">
                       {r.score}% similar
                     </Text>
                   </View>
@@ -157,7 +157,7 @@ export function SwapSheet({ visible, item, candidates, availableEquipment, onSwa
                     <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
                       {r.reasonLine}
                     </Text>
-                    <Button label="Why?" variant="ghost" onPress={() => setWhy(r)} />
+                    <Button label="Why?" variant="door" onPress={() => setWhy(r)} />
                   </View>
                 </Card>
               ))}

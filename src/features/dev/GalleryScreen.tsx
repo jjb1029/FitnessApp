@@ -7,9 +7,11 @@ import {
   Button,
   Card,
   Chip,
+  DecisionBlock,
   ExplainableValue,
   IconButton,
   ListRow,
+  Measure,
   NumericKeypad,
   ProgressBar,
   Screen,
@@ -81,7 +83,37 @@ export function GalleryScreen() {
       <Text variant="caption" color="textTertiary">
         Caption 13 tertiary
       </Text>
-      <Text variant="mono">Mono 80 × 10 · 2 RIR</Text>
+      <View style={{ gap: theme.spacing.xs, marginTop: theme.spacing.sm }}>
+        <Measure value="12" unit="reps" size="numCaption" tone="textSecondary" />
+        <Measure value="80" unit="lb" size="numBody" />
+        <Measure value="+5" unit="lb" size="numTitle" tone="success" />
+        <Measure value="80" unit="lb" size="numAction" />
+        <Measure value="1:32" size="numDisplay" tone="accent" />
+      </View>
+
+      <SectionHeader title="Decision block" />
+      <DecisionBlock
+        rank="screen"
+        eyebrow={{ text: 'Today' }}
+        lead="Upper A is ready."
+        basis="Chest, lats, and side delts. Incline press goes up to 80 lb."
+        door={{ label: 'Why?', onPress: () => setWhy(true) }}
+        action={<Button label="Start workout" size="lg" fullWidth icon="play" onPress={() => undefined} />}
+      />
+      <View style={{ marginTop: theme.spacing.xxl }}>
+        <DecisionBlock
+          rank="section"
+          eyebrow={{ text: 'Incline dumbbell press', variant: 'title' }}
+          basisPlacement="above"
+          basis="Set 2 of 3 · 8–12 reps · 2 RIR"
+          lead={<Measure value="80" unit="lb" size="numAction" />}
+          door={{ label: 'Why?', onPress: () => setWhy(true) }}
+        />
+      </View>
+      <View style={{ marginTop: theme.spacing.xxl }}>
+        <DecisionBlock rank="row" leading="Incline press" lead={<Measure value="85" unit="lb" size="numBody" />} basis="↑ 5" door={{ label: 'Why?', onPress: () => setWhy(true) }} />
+        <DecisionBlock rank="row" leading="Lat pulldown" lead={<Measure value="140" unit="lb" size="numBody" />} basis="same" door={{ label: 'Why?', onPress: () => setWhy(true) }} />
+      </View>
 
       <SectionHeader title="Buttons" />
       <View style={{ gap: theme.spacing.sm }}>
@@ -89,6 +121,7 @@ export function GalleryScreen() {
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
           <Button label="Secondary" variant="secondary" onPress={() => undefined} />
           <Button label="Ghost" variant="ghost" onPress={() => undefined} />
+          <Button label="Why?" variant="door" onPress={() => setWhy(true)} />
           <Button label="Discard" variant="destructive" onPress={() => undefined} />
           <Button label="Loading" loading onPress={() => undefined} />
           <Button label="Disabled" disabled onPress={() => undefined} />
@@ -130,8 +163,8 @@ export function GalleryScreen() {
         <Button label="Start workout" size="lg" fullWidth style={{ marginTop: theme.spacing.lg }} onPress={() => undefined} />
       </Card>
       <Card padded={false} style={{ marginTop: theme.spacing.md, paddingHorizontal: theme.spacing.lg }}>
-        <ListRow title="Bodyweight" subtitle="↓ 0.4 lb this week" value="182.4 lb" icon="scale-outline" onPress={() => undefined} />
-        <ListRow title="Strength" subtitle="Mean e1RM change, 30 days" value="+2.1 %" icon="trending-up-outline" onPress={() => undefined} />
+        <ListRow title="Bodyweight" subtitle="↓ 0.4 lb this week" value="182.4" valueUnit="lb" icon="scale-outline" onPress={() => undefined} />
+        <ListRow title="Strength" subtitle="Mean e1RM change, 30 days" value="+2.1" valueUnit="%" icon="trending-up-outline" onPress={() => undefined} />
         <ListRow title="This week" subtitle="2 of 4 sessions done" icon="calendar-outline" />
       </Card>
 

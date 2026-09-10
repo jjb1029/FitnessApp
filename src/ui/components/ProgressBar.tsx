@@ -6,12 +6,13 @@ import type { ColorName } from '../tokens';
 export type ProgressBarProps = {
   /** 0..1 */
   progress: number;
+  /** Neutral by default: teal is reserved for bars Forma owns, e.g. rest (docs/16 §5). */
   color?: ColorName;
   height?: number;
   accessibilityLabel?: string;
 };
 
-export function ProgressBar({ progress, color = 'accent', height = 4, accessibilityLabel }: ProgressBarProps) {
+export function ProgressBar({ progress, color = 'text', height = 4, accessibilityLabel }: ProgressBarProps) {
   const theme = useTheme();
   const clamped = Math.max(0, Math.min(1, progress));
   return (

@@ -240,10 +240,10 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
       </View>
       <View style={[styles.progress, { paddingHorizontal: theme.sizes.screenPaddingH }]}>
         <View style={{ flex: 1 }}>
-          <ProgressBar progress={totalPlanned > 0 ? totalDone / totalPlanned : 0} accessibilityLabel={`${totalDone} of ${totalPlanned} sets`} />
+          <ProgressBar progress={totalPlanned > 0 ? totalDone / totalPlanned : 0} color="textTertiary" accessibilityLabel={`${totalDone} of ${totalPlanned} sets`} />
         </View>
-        <Text variant="caption" color="textSecondary" style={{ fontVariant: ['tabular-nums'] }}>
-          {totalDone} of {totalPlanned} sets
+        <Text variant="caption" color="textSecondary">
+          <Text variant="numCaption">{totalDone}</Text> of <Text variant="numCaption">{totalPlanned}</Text> sets
         </Text>
       </View>
 

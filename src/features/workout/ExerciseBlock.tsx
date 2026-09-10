@@ -7,8 +7,8 @@ import { trimNumber } from '@/lib/units';
 import type { Draft } from '@/store/sessionStore';
 import { Button, Icon, IconButton, StatusPill, Text, useTheme } from '@/ui';
 
-import { SetRow } from './SetRow';
-import { formatEffort, formatSetLoad } from './format';
+import { SetRow, type RowParts } from './SetRow';
+import { formatEffort, formatSetLoad, type LoadParts } from './format';
 
 export type ExerciseBlockProps = {
   item: LoadedExercise;
@@ -97,11 +97,11 @@ export function ExerciseBlock(p: ExerciseBlockProps) {
       />,
     );
   }
-  const currentLabel = p.draft && p.draft.setId === null ? draftLabel(p.draft, item, unit, scale) : null;
-  if (currentLabel && !item.skipped) {
-    rows.push(<SetRow key="current" kind="current" index={workingIndex + 1} label={currentLabel} setType={p.draft?.setType ?? 'working'} resting={p.resting} />);
+  const draftParts = p.draft && p.draft.setId === null ? draftRowParts(p.draft, item, unit, scale) : null;
+  if (draftParts && !item.skipped) {
+    rows.push(<SetRow key="current" kind="current" index={workingIndex + 1} parts={draftParts} setType={p.draft?.setType ?? 'working'} resting={p.resting} />);
     for (let i = workingIndex + 2; i <= planned; i++) {
-      rows.push(<SetRow key={`pending-${i}`} kind="pending" index={i} label={pendingLabel(p.draft!, item, unit)} setType="working" />);
+      rows.push(<SetRow key={`pending-${i}`} kind="pending" index={i} parts={{ ...draftParts, reps: '–', effort: null }} setType="working" />);
     }
   }
 
@@ -161,19 +161,18 @@ export function specLine(sets: number, min: number, max: number): string {
   return `${sets} ${sets === 1 ? 'set' : 'sets'} of ${min}–${max}`;
 }
 
-function draftLabel(draft: Draft, item: LoadedExercise, unit: WeightUnit, scale: IntensityScale): string {
-  const load = draft.load === null ? (item.exercise.loadType === 'external' ? '—' : 'BW') : formatDraftLoad(draft.load, item, unit);
-  return `${load} × ${draft.reps}${draft.rir !== null ? ` · ${formatEffort(draft.rir, scale)}` : ''}`;
-}
-
-function pendingLabel(draft: Draft, item: LoadedExercise, unit: WeightUnit): string {
-  const load = draft.load === null ? (item.exercise.loadType === 'external' ? '—' : 'BW') : formatDraftLoad(draft.load, item, unit);
-  return `${load} × –`;
-}
-
-function formatDraftLoad(load: number, item: LoadedExercise, unit: WeightUnit): string {
-  if (item.exercise.loadType === 'bodyweight' || item.exercise.loadType === 'bodyweight_plus') return load > 0 ? `BW +${trimNumber(load)} ${unit}` : 'BW';
-  return `${trimNumber(load)} ${unit}`;
+/** The draft, split so the row is set with the same numeric treatment as a logged one. */
+function draftRowParts(draft: Draft, item: LoadedExercise, unit: WeightUnit, scale: IntensityScale): RowParts {
+  const bodyweight = item.exercise.loadType === 'bodyweight' || item.exercise.loadType === 'bodyweight_plus';
+  const load: LoadParts =
+    draft.load === null
+      ? { text: item.exercise.loadType === 'external' ? '—' : 'BW' }
+      : bodyweight
+        ? draft.load > 0
+          ? { value: `BW +${trimNumber(draft.load)}`, unit }
+          : { text: 'BW' }
+        : { value: trimNumber(draft.load), unit };
+  return { load, reps: String(draft.reps), perSide: item.exercise.laterality === 'unilateral', effort: draft.rir !== null ? formatEffort(draft.rir, scale) : null };
 }
 
 export function formatRest(seconds: number): string {

@@ -20,7 +20,7 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: theme.colors.accent,
+          tabBarActiveTintColor: theme.colors.text,
           tabBarInactiveTintColor: theme.colors.textTertiary,
           tabBarStyle: { backgroundColor: theme.colors.bg, borderTopColor: theme.colors.border, height: TAB_BAR_HEIGHT + insets.bottom, paddingTop: 6 },
           tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },

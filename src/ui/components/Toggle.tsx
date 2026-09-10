@@ -28,8 +28,9 @@ export function Toggle({ label, description, value, onValueChange, disabled }: T
         onValueChange={onValueChange}
         disabled={disabled}
         accessibilityLabel={label}
-        trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
-        thumbColor={theme.isDark ? theme.colors.text : undefined}
+        // A switch is the user's own control, so it carries ink, not teal.
+        trackColor={{ true: theme.colors.ink, false: theme.colors.border }}
+        thumbColor={value ? theme.colors.inkText : theme.isDark ? theme.colors.text : undefined}
       />
     </View>
   );
