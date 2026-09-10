@@ -21,6 +21,9 @@ This folder is the design record for the app. Each document is self-contained bu
 | 11 | [Architecture Critique](11-architecture-critique.md) | Risks, unnecessary complexity, missing pieces, proposed simplifications (proposals) |
 | 12 | [Explainability](12-explainability.md) | The four-tier "Why?" system: types, UI contract, writing rules (applied) |
 | 13 | [Phase 1 UX Specification](13-phase1-ux-spec.md) | The journey and every Phase 1 screen, workout screen in full detail; code starts here |
+| 14 | [Personality Audit](14-personality-audit.md) | Forma's voice, the workout rhythm, graded feedback, the accent change (implemented) |
+| 15 | [Product Character](15-product-character.md) | What Forma is: the Decision Block, NOW/THEN/AFTER, the caddie relationship (implemented) |
+| 16 | [Visual Identity and Delight](16-visual-identity-and-delight.md) | What Forma looks like: five visual signatures, numeric typography, the colour law (proposal) |
 
 **Validated 2026-09-07:** vertical workout layout (A/B against pager), no backend in Phase 1, single app, simplified infrastructure; the engine, explanations, offline database, and data model are never cut. Overarching rule in 01 §6.9.
 
