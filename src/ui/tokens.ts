@@ -135,8 +135,42 @@ export const primaryActionFill: 'ink' | 'accent' = 'ink';
 
 export const monospace = monoFamily;
 
+/**
+ * Motion (docs/16 §8). `fast`/`normal`/`slow` serve sheets and toasts. The
+ * rest belong to the state primitives in `motion.tsx`: each is at most 250 ms,
+ * and a whole hand-off between phases lands inside 250 ms (asserted in
+ * `motionPlan.test.ts`), because a lifter between sets never waits on the UI.
+ */
 export const motion = {
   fast: 150,
   normal: 200,
   slow: 250,
+  /** A number changing because something happened, not because the user typed it. */
+  recount: 140,
+  /** Something arriving in its final place: a set into history, an exercise into focus. */
+  settle: 180,
+  /** The outgoing state leaves quickly… */
+  handOffOut: 120,
+  /** …and the incoming one arrives just behind it. */
+  handOffIn: 180,
+  /** Supporting information, after the primary change has landed. */
+  reveal: 140,
+  /** The surface under a phase: the dock's ground and height, receding history, muted controls. */
+  ground: 220,
+  /** The gap between the primary change and what follows it. */
+  stagger: 50,
 } as const;
+
+export type Phase = 'planning' | 'lifting' | 'resting';
+
+/**
+ * The three phases (docs/16 §7). They differ in density and emphasis, never in
+ * hue: planning is spacious; lifting is tight, with the controls at full
+ * strength; resting lifts the dock's ground, lets the history recede, and mutes
+ * the controls without moving them.
+ */
+export const phases = {
+  planning: { blockGap: 32, dockGround: 'bg', historyRecede: 0, controlsOpacity: 1 },
+  lifting: { blockGap: 8, dockGround: 'bg', historyRecede: 0, controlsOpacity: 1 },
+  resting: { blockGap: 12, dockGround: 'bgElevated', historyRecede: 0.4, controlsOpacity: 0.6 },
+} as const satisfies Record<Phase, { blockGap: number; dockGround: ColorName; historyRecede: number; controlsOpacity: number }>;

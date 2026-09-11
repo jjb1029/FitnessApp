@@ -5,7 +5,7 @@ import type { IntensityScale, WeightUnit } from '@/domain';
 import type { SetRecord } from '@/engine';
 import { trimNumber } from '@/lib/units';
 import type { Draft } from '@/store/sessionStore';
-import { Button, Icon, IconButton, StatusPill, Text, useTheme } from '@/ui';
+import { Button, Icon, IconButton, Settle, StatusPill, Text, useTheme } from '@/ui';
 
 import { SetRow, type RowParts } from './SetRow';
 import { formatEffort, formatSetLoad, type LoadParts } from './format';
@@ -107,7 +107,9 @@ export function ExerciseBlock(p: ExerciseBlockProps) {
 
   const firstTime = !lastTime;
 
+  // Becoming current is an arrival: the block settles into focus once (docs/16 §8).
   return (
+    <Settle rise={4}>
     <View style={[styles.expanded, { backgroundColor: theme.colors.bgElevated, borderRadius: theme.radius.lg, marginHorizontal: theme.spacing.sm, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.md }]}>
       {/* The dock owns the exercise's identity and its numbers; this block is the history. */}
       <View style={styles.header}>
@@ -154,6 +156,7 @@ export function ExerciseBlock(p: ExerciseBlockProps) {
         </>
       )}
     </View>
+    </Settle>
   );
 }
 

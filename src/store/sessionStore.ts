@@ -246,9 +246,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const delta = pr.e1rmDeltaKg !== null && pr.e1rmDeltaKg > 0 ? `${trimNumber(Math.round(kgToUnit(pr.e1rmDeltaKg, unit)))} ${unit}` : null;
       get().setMoment(prLine(e1rm, delta), 'accent', 3500);
     } else if (isWorking) {
-      if (outcome === 'better' || outcome === 'above') haptics.success();
-      else if (outcome === 'hit') haptics.medium();
-      else haptics.tick();
+      // Graded but quiet: a light tap for a tough set, a firm one for a good or better set.
+      // The success pattern stays reserved for records, so it still means something.
+      if (outcome === 'below' || outcome === 'edit') haptics.tick();
+      else haptics.medium();
       get().setMoment(setAcknowledgement({ outcome, setIndex: workingIndex, setsRemaining }), outcome === 'better' || outcome === 'above' ? 'success' : 'neutral', 2500);
     } else {
       haptics.tick();

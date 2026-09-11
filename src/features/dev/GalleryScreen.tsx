@@ -36,6 +36,8 @@ export function GalleryScreen() {
   const toast = useToast();
   const themePreference = useUiStore((s) => s.themePreference);
   const setThemePreference = useUiStore((s) => s.setThemePreference);
+  const reduceMotion = useUiStore((s) => s.reduceMotion);
+  const setReduceMotion = useUiStore((s) => s.setReduceMotion);
 
   const [weight, setWeight] = useState(80);
   const [reps, setReps] = useState(10);
@@ -70,6 +72,9 @@ export function GalleryScreen() {
           <Chip key={p} label={p} selected={themePreference === p} onPress={() => setThemePreference(p)} />
         ))}
       </View>
+
+      <SectionHeader title="Motion" />
+      <Toggle label="Reduce motion" description="Dev override for checking every state change without animation. The system setting applies again on relaunch." value={reduceMotion} onValueChange={setReduceMotion} />
 
       <SectionHeader title="Typography" />
       <Text variant="display">Display 34</Text>

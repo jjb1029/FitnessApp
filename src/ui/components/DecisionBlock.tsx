@@ -31,8 +31,12 @@ export type DecisionBlockProps = {
   eyebrow?: DecisionEyebrow;
   /** `row` only: what the decision is about, e.g. the exercise name. */
   leading?: string;
-  /** The decision itself. Strings take the rank's size; pass a node to control it. */
-  lead: ReactNode;
+  /**
+   * The decision itself. Strings take the rank's size; pass a node to control
+   * it. Omitted only when the lead is a control rendered below the block — the
+   * dock keeps its numbers beneath a changing stage so they never move.
+   */
+  lead?: ReactNode;
   /** What the decision is based on, in the user's own numbers. */
   basis?: ReactNode;
   /**
@@ -136,7 +140,7 @@ export function DecisionBlock({ rank, eyebrow, leading, lead, basis, basisPlacem
       ) : null}
 
       {basisPlacement === 'above' ? basisNode : null}
-      <View style={{ marginTop: basisPlacement === 'above' ? theme.spacing.xs : 2 }}>{renderPart(lead, LEAD_VARIANT[rank])}</View>
+      {lead !== undefined ? <View style={{ marginTop: basisPlacement === 'above' ? theme.spacing.xs : 2 }}>{renderPart(lead, LEAD_VARIANT[rank])}</View> : null}
       {basisPlacement === 'below' ? <View style={{ marginTop: theme.spacing.xs }}>{basisNode}</View> : null}
 
       {action ? <View style={{ marginTop: rank === 'screen' ? theme.spacing.lg : theme.spacing.sm }}>{action}</View> : null}

@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import type { PerformedSetRow } from '@/data/schema';
 import type { Exercise, IntensityScale, WeightUnit } from '@/domain';
-import { Icon, Measure, StatusPill, Text, useTheme, type ColorName } from '@/ui';
+import { Focus, Icon, Measure, Settle, StatusPill, Text, useTheme, type ColorName } from '@/ui';
 
 import { effortLabel, effortValue, formatSetRow, setLoadParts, type LoadParts } from './format';
 
@@ -17,7 +15,7 @@ export type SetRowProps =
       unit: WeightUnit;
       scale: IntensityScale;
       editing: boolean;
-      /** True for the set that just landed: plays the landing highlight once. */
+      /** True for the set that just landed: it settles into history once. */
       justLanded: boolean;
       onPress: () => void;
       onDelete?: () => void;
@@ -28,7 +26,15 @@ export type SetRowProps =
 /** A planned set, split the same way a logged one is. */
 export type RowParts = { load: LoadParts; reps: string; perSide: boolean; effort: string | null };
 
-/** One line in the expanded exercise block: done (tap to edit), current (mirrors the dock), or pending preview. */
+/**
+ * One line in the expanded exercise block: done (tap to edit), current (mirrors
+ * the dock), or pending preview.
+ *
+ * Motion (docs/16 §8): a set that just landed keeps its place and lets the
+ * "current" highlight drain out of it while its check arrives — it became
+ * history. History numbers themselves never move. The highlight on the next set
+ * fades in when rest hands focus back to it.
+ */
 export function SetRow(props: SetRowProps) {
   const theme = useTheme();
   const isWarmup = props.kind === 'done' ? props.set.setType === 'warmup' : props.setType === 'warmup';
@@ -39,7 +45,7 @@ export function SetRow(props: SetRowProps) {
     const load = setLoadParts(exercise, set.loadKg, set.addedLoadKg, unit);
     const tone: ColorName = isWarmup ? 'textTertiary' : 'text';
     return (
-      <Landing active={justLanded} reduceMotion={theme.reduceMotion} tint={theme.colors.successSubtle} radius={theme.radius.sm}>
+      <Settle when={justLanded} drain={{ color: theme.colors.bgSunken, radius: theme.radius.sm }}>
         <Pressable
           onPress={onPress}
           accessibilityRole="button"
@@ -48,16 +54,16 @@ export function SetRow(props: SetRowProps) {
           <Text variant="numCaption" color={isWarmup ? 'textTertiary' : 'textSecondary'} style={styles.index}>
             {indexLabel}
           </Text>
-          <Icon name="checkmark" size={16} color={isWarmup ? 'textTertiary' : 'success'} />
+          <Settle when={justLanded} delay={theme.motion.stagger}>
+            <Icon name="checkmark" size={16} color={isWarmup ? 'textTertiary' : 'success'} />
+          </Settle>
           <View style={styles.value}>
             <LoadValue load={load} tone={tone} />
             <Text variant="callout" color="textTertiary">
               ×
             </Text>
             <Measure value={set.reps} unit={exercise.laterality === 'unilateral' ? '/ side' : null} size="numBody" tone={tone} accessible={false} />
-            {set.rir !== null ? (
-              <Measure value={effortValue(set.rir, scale)} unit={effortLabel(scale)} size="numCaption" tone="textTertiary" accessible={false} />
-            ) : null}
+            {set.rir !== null ? <Measure value={effortValue(set.rir, scale)} unit={effortLabel(scale)} size="numCaption" tone="textTertiary" accessible={false} /> : null}
           </View>
           {set.isPr ? <StatusPill label="Best" tone="success" icon="trending-up" /> : null}
           {editing && onDelete ? (
@@ -68,7 +74,7 @@ export function SetRow(props: SetRowProps) {
             </Pressable>
           ) : null}
         </Pressable>
-      </Landing>
+      </Settle>
     );
   }
 
@@ -77,27 +83,26 @@ export function SetRow(props: SetRowProps) {
   const rowTone: ColorName = isCurrent ? (resting ? 'textSecondary' : 'text') : 'textTertiary';
   const label = `${'text' in props.parts.load ? props.parts.load.text : `${props.parts.load.value} ${props.parts.load.unit ?? ''}`} × ${props.parts.reps}`;
   return (
-    <View
-      style={[styles.row, { minHeight: 40, borderRadius: theme.radius.sm, backgroundColor: isCurrent && !resting ? theme.colors.bgSunken : 'transparent' }]}
-      accessible
-      accessibilityLabel={`Set ${indexLabel}, ${isCurrent ? (resting ? 'next, resting' : 'current') : 'pending'}, ${label}`}>
-      <Text variant="numCaption" color={isCurrent ? 'text' : 'textTertiary'} style={styles.index}>
-        {indexLabel}
-      </Text>
-      {isCurrent ? <Icon name={resting ? 'time-outline' : 'play'} size={14} color={resting ? 'textSecondary' : 'text'} /> : <View style={{ width: 16 }} />}
-      <View style={styles.value}>
-        <LoadValue load={props.parts.load} tone={rowTone} />
-        <Text variant="callout" color="textTertiary">
-          ×
+    <Focus visible={isCurrent && !resting} identity={props.index} color={theme.colors.bgSunken} radius={theme.radius.sm}>
+      <View style={[styles.row, { minHeight: 40 }]} accessible accessibilityLabel={`Set ${indexLabel}, ${isCurrent ? (resting ? 'next, resting' : 'current') : 'pending'}, ${label}`}>
+        <Text variant="numCaption" color={isCurrent ? 'text' : 'textTertiary'} style={styles.index}>
+          {indexLabel}
         </Text>
-        <Measure value={props.parts.reps} unit={props.parts.perSide ? '/ side' : null} size="numBody" tone={rowTone} accessible={false} />
-        {props.parts.effort ? (
-          <Text variant="numCaption" color="textTertiary">
-            {props.parts.effort}
+        {isCurrent ? <Icon name={resting ? 'time-outline' : 'play'} size={14} color={resting ? 'textSecondary' : 'text'} /> : <View style={{ width: 16 }} />}
+        <View style={styles.value}>
+          <LoadValue load={props.parts.load} tone={rowTone} />
+          <Text variant="callout" color="textTertiary">
+            ×
           </Text>
-        ) : null}
+          <Measure value={props.parts.reps} unit={props.parts.perSide ? '/ side' : null} size="numBody" tone={rowTone} accessible={false} />
+          {props.parts.effort ? (
+            <Text variant="numCaption" color="textTertiary">
+              {props.parts.effort}
+            </Text>
+          ) : null}
+        </View>
       </View>
-    </View>
+    </Focus>
   );
 }
 
@@ -111,26 +116,6 @@ function LoadValue({ load, tone }: { load: LoadParts; tone: ColorName }) {
     );
   }
   return <Measure value={load.value} unit={load.unit} size="numBody" tone={tone} accessible={false} />;
-}
-
-/** Fades a success tint in and out once when a set lands. Instant under reduced motion. */
-function Landing({ active, reduceMotion, tint, radius, children }: { active: boolean; reduceMotion: boolean; tint: string; radius: number; children: React.ReactNode }) {
-  const opacity = useSharedValue(0);
-  useEffect(() => {
-    if (!active || reduceMotion) {
-      opacity.set(0);
-      return;
-    }
-    opacity.set(withTiming(1, { duration: 120 }));
-    opacity.set(withDelay(700, withTiming(0, { duration: 400 })));
-  }, [active, reduceMotion, opacity]);
-  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
-  return (
-    <View>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: radius }, style]} />
-      {children}
-    </View>
-  );
 }
 
 const styles = StyleSheet.create({

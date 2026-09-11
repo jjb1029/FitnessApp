@@ -11,7 +11,7 @@ import { displayLoad, incrementStepInUnit, trimNumber, unitToKg } from '@/lib/un
 import { haptics } from '@/services/haptics';
 import { isExerciseDone, useSessionStore } from '@/store/sessionStore';
 import { useUiStore } from '@/store/uiStore';
-import { ErrorState, IconButton, NumericKeypad, ProgressBar, Skeleton, Text, useTheme, useToast, WhySheet } from '@/ui';
+import { ErrorState, IconButton, NumericKeypad, ProgressBar, Recede, Recount, Skeleton, Text, phases, useGround, useTheme, useToast, WhySheet } from '@/ui';
 
 import { useCurrentUser } from '../app/UserProvider';
 import { useNow } from '../app/useNow';
@@ -22,7 +22,8 @@ import { SummaryView } from './SummaryView';
 import { AddExerciseSheet, ConfirmSheet, ExerciseInfoSheet, ExerciseMenuSheet, NoteSheet, RirSheet, SessionMenuSheet, SkipSheet, SwapSheet } from './sheets';
 import { effortLabel, effortValue, isBodyweightExercise } from './format';
 
-const REST_UP_LINGER_MS = 2000;
+/** How long "Rest's up." stays in the dock after rest has handed back to lifting. */
+const REST_UP_MOMENT_MS = 2000;
 const ARRIVAL_MS = 5000;
 
 export function WorkoutScreen({ sessionId }: { sessionId: string }) {
@@ -37,8 +38,9 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   const now = useNow(250);
   const listRef = useRef<FlatList<LoadedExercise>>(null);
   const [dockHeight, setDockHeight] = useState(220);
+  // The list reserves the tallest the dock has been, so entering or leaving rest never shifts it.
+  const reserveDock = useCallback((h: number) => setDockHeight((prev) => Math.max(prev, h)), []);
   const [catalog, setCatalog] = useState<Exercise[]>([]);
-  const [returnKey, setReturnKey] = useState(0);
   const [sheet, setSheet] = useState<null | 'rir' | 'keypad-load' | 'keypad-reps' | 'why' | 'swap' | 'note' | 'skip' | 'menu' | 'info' | 'session' | 'add' | 'finish' | 'discard'>(null);
   const [whyTarget, setWhyTarget] = useState<{ title: string; explanation: Explanation } | null>(null);
 
@@ -90,20 +92,17 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
       }
     }
   }, [rest, remainingSec, restEnded, restEndsAt]);
-  const endedFor = useRef<number | null>(null);
+  // At zero, hand straight back to lifting (docs/16 §9 M3): one pulse, "Rest's up."
+  // in the dock, focus returned to Complete set. The user never waits on a finished timer.
+  const [handedBackFrom, setHandedBackFrom] = useState<number | null>(null);
+  if (restEnded && restEndsAt !== null && handedBackFrom !== restEndsAt) setHandedBackFrom(restEndsAt);
   useEffect(() => {
-    if (!restEnded || restEndsAt === null) return undefined;
-    if (endedFor.current !== restEndsAt) {
-      endedFor.current = restEndsAt;
-      haptics.medium();
-      useSessionStore.getState().setMoment(REST_UP_LINE, 'accent', REST_UP_LINGER_MS);
-    }
-    const t = setTimeout(() => {
-      useSessionStore.getState().skipRest();
-      setReturnKey((k) => k + 1);
-    }, REST_UP_LINGER_MS);
-    return () => clearTimeout(t);
-  }, [restEnded, restEndsAt]);
+    if (handedBackFrom === null) return;
+    haptics.medium();
+    const session = useSessionStore.getState();
+    session.setMoment(REST_UP_LINE, 'accent', REST_UP_MOMENT_MS);
+    session.skipRest();
+  }, [handedBackFrom]);
 
   // ---- Arrival: Forma speaks up only when it did something worth knowing (docs/15 §5).
   // Held back while resting so it lands when the user returns to the action.
@@ -144,7 +143,8 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
   const totalPlanned = loaded ? loaded.exercises.filter((e) => !e.skipped).reduce((a, e) => a + e.targetSnapshot.workingSets, 0) : 0;
   const totalDone = loaded ? loaded.exercises.reduce((a, e) => a + e.sets.filter((s) => s.setType === 'working').length, 0) : 0;
   const elapsed = loaded ? Math.max(0, (now - Date.parse(loaded.session.startedAt)) / 1000) : 0;
-  const resting = rest !== null && (remainingSec === null || remainingSec > 0 || restEnded);
+  const resting = rest !== null;
+  const restGround = useGround(resting);
   const phase = allDone ? 'Last one done' : resting ? 'Resting' : 'Lifting';
 
   // ---- The dock's one line slot: Forma's moment, the decision, or the quiet basis.
@@ -240,11 +240,18 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
       </View>
       <View style={[styles.progress, { paddingHorizontal: theme.sizes.screenPaddingH }]}>
         <View style={{ flex: 1 }}>
-          <ProgressBar progress={totalPlanned > 0 ? totalDone / totalPlanned : 0} color="textTertiary" accessibilityLabel={`${totalDone} of ${totalPlanned} sets`} />
+          <ProgressBar progress={totalPlanned > 0 ? totalDone / totalPlanned : 0} color="textTertiary" animateMs={theme.motion.settle} accessibilityLabel={`${totalDone} of ${totalPlanned} sets`} />
         </View>
-        <Text variant="caption" color="textSecondary">
-          <Text variant="numCaption">{totalDone}</Text> of <Text variant="numCaption">{totalPlanned}</Text> sets
-        </Text>
+        <View style={styles.count} accessible accessibilityLabel={`${totalDone} of ${totalPlanned} sets`}>
+          <Recount trigger={totalDone} value={totalDone}>
+            <Text variant="numCaption" color="textSecondary">
+              {totalDone}
+            </Text>
+          </Recount>
+          <Text variant="caption" color="textSecondary">
+            {' '}of <Text variant="numCaption">{totalPlanned}</Text> sets
+          </Text>
+        </View>
       </View>
 
       {!loaded ? (
@@ -255,6 +262,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
           <Skeleton height={40} />
         </View>
       ) : (
+        <View style={styles.listHost}>
         <FlatList
           ref={listRef}
           data={loaded.exercises}
@@ -291,6 +299,9 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
             />
           )}
         />
+        {/* Resting: the history recedes under the ground so the countdown owns the screen. Still legible, still tappable. */}
+        <Recede testID="history-recede" progress={restGround} amount={phases.resting.historyRecede} color={theme.colors.bg} />
+        </View>
       )}
 
       <View style={styles.dockHost}>
@@ -301,8 +312,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
           scale={scale}
           rest={rest}
           now={now}
-          restEnded={restEnded}
-          returnKey={returnKey}
+          returnKey={handedBackFrom ?? 0}
           line={dockLine}
           allDone={allDone}
           onChange={store.updateDraft}
@@ -321,7 +331,7 @@ export function WorkoutScreen({ sessionId }: { sessionId: string }) {
           onFinish={() => (allDone ? finish(false) : setSheet('finish'))}
           onAdjustRest={store.adjustRest}
           onSkipRest={store.skipRest}
-          onLayout={setDockHeight}
+          onReservedHeight={reserveDock}
         />
       </View>
 
@@ -421,5 +431,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', height: 56, gap: 8 },
   progress: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 4 },
+  listHost: { flex: 1 },
+  count: { flexDirection: 'row', alignItems: 'baseline' },
   dockHost: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 });

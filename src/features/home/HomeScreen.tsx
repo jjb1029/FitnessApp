@@ -9,7 +9,7 @@ import { greetingForHour, localDate, weeksSince } from '@/lib/dates';
 import { formatWeight, kgToUnit, unitToKg } from '@/lib/units';
 import { GOAL_LABEL } from '@/store/onboardingStore';
 import { useUiStore } from '@/store/uiStore';
-import { Button, Card, IconButton, ListRow, NumericKeypad, Screen, Sheet, Skeleton, Text, WhySheet, useTheme, useToast } from '@/ui';
+import { Button, Card, IconButton, ListRow, NumericKeypad, Screen, Sheet, Skeleton, Text, WhySheet, phases, useTheme, useToast } from '@/ui';
 
 import { useCurrentUser } from '../app/UserProvider';
 import { useNow } from '../app/useNow';
@@ -135,7 +135,7 @@ export function HomeScreen() {
         )}
       </View>
 
-      <Card padded={false} style={{ marginTop: theme.spacing.xxxl, paddingHorizontal: theme.spacing.lg }}>
+      <Card padded={false} style={{ marginTop: phases.planning.blockGap, paddingHorizontal: theme.spacing.lg }}>
         <ListRow
           title="Bodyweight"
           subtitle={weightSubtitle}

@@ -4,6 +4,21 @@ Forma is a mobile strength-training app with one promise: tell it what you want 
 
 ---
 
+## 2026-09-11 · Visual identity, Tier 2A: the interface knows which phase you are in
+
+Motion that communicates state, never decoration (docs/16 §7–§8). No new features, no engine or data-model change, and logging takes the same taps.
+
+- **Five primitives, one budget.** `src/ui/motion.tsx` holds Ground (a phase's surface), Settle (something arriving in its place), Hand-off (one state giving way to the next in place), Reveal (supporting information after the primary change) and Recount (a number that changed because something happened). Each lands inside 250 ms, never gates a tap, and becomes an instant state change under reduced motion. The timing rules are pure and tested in `motionPlan.ts`: the budget, the order meaning arrives in, reduced motion, and that a number never recounts under the user's thumb.
+- **The dock breathes instead of jumping.** It is now a stage above a fixed base. The base — weight, reps, effort, the button — never moves. The stage hands off between lifting and resting and glides between their heights, the dock's ground lifts while resting, and the list reserves the taller stage up front. Measured before the change: the dock's top edge snapped 69 px at every rest.
+- **Resting looks like resting.** The history recedes under a veil of the page ground, the controls mute in place, and the countdown owns the dock. The numerals never animate; only the bar moves, now continuously.
+- **Rest hands back at zero.** Measured before: `0:00` sat on screen for about two seconds. Now the dock returns to lifting in one hand-off, "Rest's up." becomes the lifting line, and focus goes back to Complete set.
+- **Sets and exercises arrive.** A logged set keeps its place while its highlight drains and its check arrives; the next set's highlight fades in when rest ends; an exercise that becomes current settles into focus; the set count ticks over.
+- **Haptics are confirmation.** The success pattern is kept for records. Good and better sets are a medium tap, tough sets a light one.
+
+174 tests, 14 of them frame-by-frame checks of the primitives on Reanimated's test clock: the order of a hand-off, that the dock glides rather than snaps, that everything has landed by 250 ms, that reduced motion is instant, that a hidden stage takes no touches and cannot be reached by a screen reader, and that a number never recounts under the user's thumb. Jest now uses the worklets resolver so Reanimated runs in tests.
+
+In the browser, read at each phase's end state: Complete set stays put and the list's reserved padding never changes across lifting, resting and lifting again, while the dock's stage goes 78 → 159 → 78 pt. Rest hands back within one timer tick of zero with "Rest's up.", and moving to the next exercise and finishing both work end to end. The preview pane was not rendering animation frames, so how the motion feels still needs judging on the phone.
+
 ## 2026-09-10 · Visual identity, Tier 1: numbers, the Decision Block, and what teal means
 
 Three changes that give Forma a look rather than a theme (docs/16, Tier 1 of four). No new features, no engine change, no data-model change.

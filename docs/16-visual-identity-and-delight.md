@@ -1,11 +1,18 @@
 # 16 · Visual Identity and Delight
 
-Status: **approved 2026-09-10. Tier 1 implemented; Tiers 2–4 not started.**
+Status: **approved 2026-09-10. Tier 1 implemented 2026-09-10. Tier 2A (state and breathing) implemented 2026-09-11. Borderless workout surfaces and Tiers 3–4 not started.**
 
 Approval amendments:
 - **The ink primary button is an experiment, not a law.** It ships behind `primaryActionFill` in `src/ui/tokens.ts`; flipping that one value restores the teal button everywhere. Judge it on device before it is locked in.
 - **"Space over borders" is not "cards are forbidden."** A container has to communicate meaning: keep it where it stands for a genuinely discrete object or collection, remove it where it only wraps content that space and hierarchy could group. Under that rule the Today block, the summary's next-time list and the finish verdict lost their cards; Home's bodyweight/week list, the deferred strip and the settings groups kept theirs.
 - **Teal marks what Forma computed; green marks what the user did.** An estimated 1RM is Forma's inference, so a record's estimated max is teal; a logged +5 lb or +1 rep is the user's own fact, so it is green. This resolves the tension between §5's colour law and §9's M4.
+
+Tier 2A decisions, where the implementation departs from the text below:
+- **The list reserves the dock's height; the dock itself breathes.** §7 proposed a fixed-height dock. Holding the resting height permanently would leave about 70 pt of empty dock while lifting — the phase that needs the most room for the workout — so the dock's stage glides between its lifting and resting heights over 220 ms, and the list reserves the taller one up front. The workout underneath never moves and the controls never move; only the dock's top edge travels, and it glides instead of snapping.
+- **Rest hands back at zero.** The two-second linger on `0:00` is gone. At zero the dock returns to lifting in one hand-off, and "Rest's up." is the lifting line for two seconds.
+- **No hand-off layer translates.** §8's primitives are implemented in `src/ui/motion.tsx` with their timing rules in `motionPlan.ts`; the one change is that stages cross-fade in place, so the countdown's numerals never move.
+- **The ground stays neutral.** No `restGround` token. Resting lifts the dock to `bgElevated`, veils the history with the page ground at 40 %, and mutes the controls to 60 %. The phase table is `phases` in `tokens.ts`.
+- **The success haptic is kept for records.** Every good or better working set is a medium tap; a tough set is a light one.
 
 This document sits beside docs/14 (how Forma speaks) and docs/15 (what Forma is and how screens are arranged). It answers a third question: **what Forma looks like.**
 

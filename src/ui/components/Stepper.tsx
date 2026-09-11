@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Recount } from '../motion';
 import { useTheme } from '../theme';
 import type { NumericSize } from '../tokens';
 import { Icon } from './Icon';
@@ -26,6 +27,12 @@ export type StepperProps = {
   onBump?: () => void;
   /** Dims the control without disabling it, e.g. during rest. */
   muted?: boolean;
+  /**
+   * What this value belongs to, e.g. the exercise and set. When it changes and
+   * the value changed with it, the number recounts; the user's own nudges never
+   * animate (docs/16 §8).
+   */
+  recountKey?: string;
   accessibilityLabel: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -48,6 +55,7 @@ export function Stepper({
   size = 'md',
   onBump,
   muted = false,
+  recountKey,
   accessibilityLabel,
   style,
   testID,
@@ -122,7 +130,9 @@ export function Stepper({
         disabled={!onPressValue}
         accessibilityLabel={`Edit ${accessibilityLabel}`}
         style={({ pressed }) => [styles.middle, stackedUnit && styles.middleWithUnit, pressed && onPressValue && { opacity: 0.6 }]}>
-        <Measure value={display} unit={stackedUnit ? null : unit} size={numericSize} tone={isPrimary ? 'text' : 'textSecondary'} layout="inline" fit accessible={false} />
+        <Recount trigger={recountKey ?? ''} value={display} style={styles.recount}>
+          <Measure value={display} unit={stackedUnit ? null : unit} size={numericSize} tone={isPrimary ? 'text' : 'textSecondary'} layout="inline" fit accessible={false} />
+        </Recount>
       </Pressable>
       <Pressable
         onPress={() => bump(1)}
@@ -150,6 +160,7 @@ const styles = StyleSheet.create({
   side: { width: 44, alignItems: 'center', justifyContent: 'center' },
   middle: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   middleWithUnit: { paddingBottom: 14 },
+  recount: { maxWidth: '100%' },
   spanningUnit: { position: 'absolute', left: 0, right: 0, bottom: 6, textAlign: 'center' },
   disabled: { opacity: 0.35 },
 });
